@@ -19,6 +19,8 @@ package com.github.fhuz.kafka.streams.cep.nfa;
 import com.github.fhuz.kafka.streams.cep.Event;
 import com.github.fhuz.kafka.streams.cep.State;
 
+import java.util.Collection;
+
 /**
  * Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
  *
@@ -56,7 +58,7 @@ public class ComputationState<K, V> {
     }
 
     public boolean isOutOfWindow(long time) {
-        return (time - timestamp) > state.getWindowMs();
+        return state.getWindowMs() != -1 && (time - timestamp) > state.getWindowMs();
     }
 
     public State<K, V> getState() {

@@ -22,6 +22,7 @@ import com.github.fhuz.kafka.streams.cep.pattern.Matcher;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -38,7 +39,7 @@ public class State<K, V> implements Serializable, Comparable<State<K, V>> {
      */
     public State() {}
 
-    private Collection<Edge<K, V>> edges;
+    private List<Edge<K, V>> edges;
 
     /**
      * Creates a new {@link State} instance.
@@ -65,7 +66,7 @@ public class State<K, V> implements Serializable, Comparable<State<K, V>> {
         return this;
     }
 
-    public Collection<Edge<K, V>> getEdges() {
+    public List<Edge<K, V>> getEdges() {
         return edges;
     }
 

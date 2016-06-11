@@ -116,15 +116,22 @@ public class NFA<K, V> implements Serializable {
     private List<ComputationState<K, V>> getAllNonFinalStates(Collection<ComputationState<K, V>> states) {
         return states
                 .stream()
-                .filter(c -> ! c.getState().isFinalState())
+                .filter(c -> ! isForwardingToFinalState(c))
                 .collect(Collectors.toList());
     }
 
     private List<ComputationState<K, V>> getAllFinalStates(Collection<ComputationState<K, V>> states) {
         return states
                 .stream()
-                .filter(c -> c.getState().isFinalState())
+                .filter(this::isForwardingToFinalState)
                 .collect(Collectors.toList());
+    }
+
+    private boolean isForwardingToFinalState(ComputationState<K, V> c) {
+        List<State.Edge<K, V>> edges = c.getState().getEdges();
+        return ( edges.size() > 0
+                && edges.get(0).is(EdgeOperation.PROCEED)
+                && edges.get(0).getTarget().isFinalState());
     }
 
     private Collection<ComputationState<K, V>> matchPattern(ProcessorContext context, K key, V value, long timestamp, ComputationState<K, V> computationState) {
@@ -169,16 +176,16 @@ public class NFA<K, V> implements Serializable {
                     case TAKE :
                         if( ! isBranching ) {
                             nextComputationStates.add(computationState);
-                            sharedVersionedBuffer.put(state, currentEvent, previousState, previousEvent, version);
+                            sharedVersionedBuffer.put(currentState, currentEvent, previousState, previousEvent, version);
                         } else {
-                            sharedVersionedBuffer.put(state, currentEvent, version.addRun());
+                            sharedVersionedBuffer.put(currentState, currentEvent, version.addRun());
                         }
                         break;
                     case BEGIN :
                         if( previousState != null)
-                            sharedVersionedBuffer.put(state, currentEvent, previousState, previousEvent, version);
+                            sharedVersionedBuffer.put(currentState, currentEvent, previousState, previousEvent, version);
                         else
-                            sharedVersionedBuffer.put(state, currentEvent, version);
+                            sharedVersionedBuffer.put(currentState, currentEvent, version);
                         nextComputationStates.add(new ComputationState<>(epsilonState, version.addStage(), currentEvent, nextTimestamp));
                         break;
                     case IGNORE:
@@ -202,7 +209,7 @@ public class NFA<K, V> implements Serializable {
     }
 
     private State<K, V> newEpsilonState(State<K, V> current, State<K, V> target) {
-        State<K, V> newState = new State<>(current.getName(), target.getType());
+        State<K, V> newState = new State<>(current.getName(), current.getType());
         newState.addEdge(new State.Edge<>(EdgeOperation.PROCEED, (k, v,t, s) -> true, target));
 
         return newState;
