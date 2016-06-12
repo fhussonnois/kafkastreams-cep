@@ -124,25 +124,17 @@ public class KVSharedVersionedBuffer<K , V> implements SharedVersionedBuffer<K, 
     @Override
     public Sequence<K, V> get(final State<K, V> state, final Event<K, V> event, final DeweyVersion version) {
 
-        LinkedHashMap<String, List<Event<K, V>>> sequence = new LinkedHashMap<>();
-
         Pointer<K, V> pointer = new Pointer<>(version, newStackEventKey(state, event));
 
+        Sequence<K, V> sequence = new Sequence<>();
         while(pointer != null && pointer.key != null) {
             final StackEventKey<K, V> stateKey  = pointer.key;
             final TimedKeyValue<K, V> stateValue = this.store.get(stateKey);
 
-            String stateName = stateKey.state.name;
-            List<Event<K, V>> events = sequence.get(stateName);
-            if( events == null) {
-                events = new LinkedList<>();
-                sequence.put(stateName, events);
-            }
-            events.add(newEvent(stateKey, stateValue));
+            sequence.add(stateKey.state.name, newEvent(stateKey, stateValue));
             pointer = stateValue.getPointerByVersion(pointer.version);
         }
-
-        return new Sequence<>(sequence);
+        return sequence;
     }
 
     @Override

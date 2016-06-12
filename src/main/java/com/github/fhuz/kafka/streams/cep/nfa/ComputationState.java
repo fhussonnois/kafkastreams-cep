@@ -19,7 +19,7 @@ package com.github.fhuz.kafka.streams.cep.nfa;
 import com.github.fhuz.kafka.streams.cep.Event;
 import com.github.fhuz.kafka.streams.cep.State;
 
-import java.util.Collection;
+import java.util.List;
 
 /**
  * Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
@@ -29,17 +29,17 @@ import java.util.Collection;
  */
 public class ComputationState<K, V> {
 
-    private State<K , V> state;
+    private final State<K , V> state;
 
     /**
      * The pointer to the most recent event into the share buffer.
      */
-    private Event<K, V> event;
+    private final Event<K, V> event;
 
     /**
      * Timestamp of the first event for this pattern.
      */
-    private long timestamp;
+    private final long timestamp;
 
     /**
      * The version number.
@@ -61,6 +61,31 @@ public class ComputationState<K, V> {
         return state.getWindowMs() != -1 && (time - timestamp) > state.getWindowMs();
     }
 
+    /**
+     * @see {@link State#isBeginState()}.
+     */
+    public boolean isBeginState() {
+        return state.isBeginState();
+    }
+
+    /**
+     * Checks whether this {@link ComputationState} is forwarding to the next state.
+     * @return <code>true</code> if this computation contains a single "proceed" operation.
+     */
+    public boolean isForwarding( ) {
+        List<State.Edge<K, V>> edges = state.getEdges();
+        return ( edges.size() == 1 && edges.get(0).is(EdgeOperation.PROCEED));
+    }
+
+    /**
+     * Checks whether this {@link ComputationState} is forwarding to the final state.
+     */
+    public boolean isForwardingToFinalState( ) {
+        List<State.Edge<K, V>> edges = state.getEdges();
+        return ( isForwarding()
+                && edges.get(0).getTarget().isFinalState());
+    }
+
     public State<K, V> getState() {
         return state;
     }
@@ -75,6 +100,10 @@ public class ComputationState<K, V> {
 
     public DeweyVersion getVersion() {
         return version;
+    }
+
+    public ComputationState<K, V> setEvent(Event<K, V> event) {
+        return new ComputationState<>(state, version, event, timestamp);
     }
 
     @Override

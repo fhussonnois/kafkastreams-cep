@@ -30,7 +30,6 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
-import java.util.Stack;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 
@@ -88,7 +87,7 @@ public class NFA<K, V> implements Serializable {
         while(numberOfStateToProcess-- > 0) {
             ComputationState<K, V> computationState = computationStates.poll();
 
-            Collection<ComputationState<K, V>> states = matchPattern(this.context, key, value, timestamp, computationState);
+            Collection<ComputationState<K, V>> states = matchPattern(new ComputationContext<K, V>(this.context, key, value, timestamp, computationState));
             if( states.isEmpty() )
                 removePattern(computationState);
             else
@@ -100,9 +99,9 @@ public class NFA<K, V> implements Serializable {
 
     private List<Sequence<K, V>> matchConstruction(Collection<ComputationState<K, V>> states) {
         return getAllFinalStates(states)
-        .stream()
-        .map(c -> sharedVersionedBuffer.get(c.getState(), c.getEvent(), c.getVersion()))
-        .collect(Collectors.toList());
+                .stream()
+                .map(c -> sharedVersionedBuffer.get(c.getState(), c.getEvent(), c.getVersion()))
+                .collect(Collectors.toList());
     }
 
     private void removePattern(ComputationState<K, V> computationState) {
@@ -116,96 +115,86 @@ public class NFA<K, V> implements Serializable {
     private List<ComputationState<K, V>> getAllNonFinalStates(Collection<ComputationState<K, V>> states) {
         return states
                 .stream()
-                .filter(c -> ! isForwardingToFinalState(c))
+                .filter(c -> !c.isForwardingToFinalState())
                 .collect(Collectors.toList());
     }
 
     private List<ComputationState<K, V>> getAllFinalStates(Collection<ComputationState<K, V>> states) {
         return states
                 .stream()
-                .filter(this::isForwardingToFinalState)
+                .filter(ComputationState::isForwardingToFinalState)
                 .collect(Collectors.toList());
     }
 
-    private boolean isForwardingToFinalState(ComputationState<K, V> c) {
-        List<State.Edge<K, V>> edges = c.getState().getEdges();
-        return ( edges.size() > 0
-                && edges.get(0).is(EdgeOperation.PROCEED)
-                && edges.get(0).getTarget().isFinalState());
-    }
-
-    private Collection<ComputationState<K, V>> matchPattern(ProcessorContext context, K key, V value, long timestamp, ComputationState<K, V> computationState) {
+    private Collection<ComputationState<K, V>> matchPattern(ComputationContext<K, V> ctx) {
         Collection<ComputationState<K, V>> nextComputationStates = new ArrayList<>();
 
-        final Event<K, V> previousEvent = computationState.getEvent();
-        final State<K, V> state = computationState.getState();
-        final DeweyVersion version = computationState.getVersion();
-        final boolean isBeginState = state.isBeginState();
-
-        if( !isBeginState && computationState.isOutOfWindow(timestamp) )
+        // Checks the time window of the current state.
+        if( !ctx.getComputationState().isBeginState() && ctx.getComputationState().isOutOfWindow(ctx.getTimestamp()) )
             return nextComputationStates;
 
-        final long nextTimestamp = isBeginState ? timestamp : computationState.getTimestamp();
+        nextComputationStates = evaluate(ctx, ctx.getComputationState().getState(), null);
 
-        Stack<State<K, V>> states = new Stack<>();
-        states.push(state);
-
-        State<K, V> previousState = null;
-        while( ! states.isEmpty() ) {
-            State<K, V> currentState = states.pop();
-
-            List<State.Edge<K, V>> matchedEdges = currentState.getEdges()
-                    .stream()
-                    .filter(e -> e.matches(key, value, timestamp))
-                    .collect(Collectors.toList());
-
-            List<EdgeOperation> matchedOperations = matchedEdges
-                    .stream()
-                    .map(State.Edge::getOperation)
-                    .collect(Collectors.toList());
-
-            final boolean isBranching = isBranching(matchedOperations);
-            Event<K, V> currentEvent = newEvent(context, key, value);
-            for(State.Edge<K, V> e : matchedEdges) {
-                State<K, V> epsilonState = newEpsilonState(currentState, e.getTarget());
-                switch (e.getOperation()) {
-                    case PROCEED:
-                        previousState = currentState;
-                        states.push(e.getTarget());
-                        break;
-                    case TAKE :
-                        if( ! isBranching ) {
-                            nextComputationStates.add(computationState);
-                            sharedVersionedBuffer.put(currentState, currentEvent, previousState, previousEvent, version);
-                        } else {
-                            sharedVersionedBuffer.put(currentState, currentEvent, version.addRun());
-                        }
-                        break;
-                    case BEGIN :
-                        if( previousState != null)
-                            sharedVersionedBuffer.put(currentState, currentEvent, previousState, previousEvent, version);
-                        else
-                            sharedVersionedBuffer.put(currentState, currentEvent, version);
-                        nextComputationStates.add(new ComputationState<>(epsilonState, version.addStage(), currentEvent, nextTimestamp));
-                        break;
-                    case IGNORE:
-                        if(!isBranching)
-                            nextComputationStates.add(computationState);
-                        break;
-                }
-            }
-
-            if(isBranching) {
-                State<K, V> epsilonState = newEpsilonState(currentState, currentState);
-                nextComputationStates.add(new ComputationState<>(epsilonState, version.addRun(), currentEvent, nextTimestamp));
-            }
-        }
-
-        if( isBeginState ) {
-            nextComputationStates.add(new ComputationState<>(state, version.addRun()));
+        // Begin state should always be re-add to allow multiple runs.
+        if(ctx.getComputationState().isBeginState() && !ctx.getComputationState().isForwarding()) {
+            DeweyVersion version = ctx.getComputationState().getVersion();
+            DeweyVersion newVersion = (nextComputationStates.isEmpty()) ? version : version.addRun();
+            nextComputationStates.add(new ComputationState<>(ctx.getComputationState().getState(), newVersion));
         }
 
         return nextComputationStates;
+    }
+
+    private Collection<ComputationState<K, V>> evaluate(ComputationContext<K, V> ctx, State<K, V> currentState, State<K, V> previousState) {
+        ComputationState<K, V> computationState = ctx.computationState;
+        final Event<K, V> previousEvent = computationState.getEvent();
+        final DeweyVersion version      = computationState.getVersion();
+
+        List<State.Edge<K, V>> matchedEdges = matchEdgesAndGet(ctx.key, ctx.value, ctx.timestamp, currentState);
+
+        Collection<ComputationState<K, V>> nextComputationStates = new ArrayList<>();
+        final boolean isBranching = isBranching(matchedEdges);
+        Event<K, V> currentEvent = ctx.getEvent();
+        for(State.Edge<K, V> e : matchedEdges) {
+            State<K, V> epsilonState = newEpsilonState(currentState, e.getTarget());
+            switch (e.getOperation()) {
+                case PROCEED:
+                    nextComputationStates.addAll(evaluate(ctx, e.getTarget(), currentState));
+                    break;
+                case TAKE :
+                    if( ! isBranching ) {
+                        nextComputationStates.add(computationState.setEvent(currentEvent));
+                        sharedVersionedBuffer.put(currentState, currentEvent, previousState, previousEvent, version);
+                    } else {
+                        sharedVersionedBuffer.put(currentState, currentEvent, version.addRun());
+                    }
+                    break;
+                case BEGIN :
+                    if( previousState != null)
+                        sharedVersionedBuffer.put(currentState, currentEvent, previousState, previousEvent, version);
+                    else
+                        sharedVersionedBuffer.put(currentState, currentEvent, version);
+                    nextComputationStates.add(new ComputationState<>(epsilonState, version.addStage(), currentEvent, ctx.getFirstPatternTimestamp()));
+                    break;
+                case IGNORE:
+                    if(!isBranching)
+                        nextComputationStates.add(computationState);
+                    break;
+            }
+        }
+
+        if(isBranching) {
+            State<K, V> epsilonState = newEpsilonState(currentState, currentState);
+            nextComputationStates.add(new ComputationState<>(epsilonState, version.addRun(), currentEvent, ctx.getFirstPatternTimestamp()));
+        }
+        return nextComputationStates;
+    }
+
+    private List<State.Edge<K, V>> matchEdgesAndGet(K key, V value, long timestamp, State<K, V> currentState) {
+        return currentState.getEdges()
+                .stream()
+                .filter(e -> e.matches(key, value, timestamp))
+                .collect(Collectors.toList());
     }
 
     private State<K, V> newEpsilonState(State<K, V> current, State<K, V> target) {
@@ -215,17 +204,79 @@ public class NFA<K, V> implements Serializable {
         return newState;
     }
 
-    private boolean isBranching(Collection<EdgeOperation> matchedOperations) {
+    private boolean isBranching(Collection<State.Edge<K, V>> edges) {
+        List<EdgeOperation> matchedOperations = edges
+                .stream()
+                .map(State.Edge::getOperation)
+                .collect(Collectors.toList());
         return matchedOperations.containsAll(Arrays.asList(EdgeOperation.PROCEED, EdgeOperation.TAKE) )  // allowed with multiple match
                 || matchedOperations.containsAll(Arrays.asList(EdgeOperation.IGNORE, EdgeOperation.TAKE) ) // allowed by skip-till-any-match
                 || matchedOperations.containsAll(Arrays.asList(EdgeOperation.IGNORE, EdgeOperation.BEGIN) ) // allowed by skip-till-any-match
                 || matchedOperations.containsAll(Arrays.asList(EdgeOperation.IGNORE, EdgeOperation.PROCEED) ); //allowed by skip-till-next-match or skip-till-any-match
     }
 
-    private Event<K, V> newEvent(ProcessorContext context, K key, V value) {
-        return new Event<>(key, value, context.timestamp(), context.topic(), context.partition(), context.offset());
+    /**
+     * Class to wrap all data required to evaluate a state against an event.
+     */
+    private static class ComputationContext<K, V> {
+        /**
+         * The current processor context.
+         */
+        private final ProcessorContext context;
+        /**
+         * The current event key.
+         */
+        private final K key;
+        /**
+         * The current event value.
+         */
+        private final V value;
+        /**
+         * The current event timestamp.
+         */
+        private final long timestamp;
+        /**
+         * The current state to compute.
+         */
+        private final ComputationState<K, V> computationState;
+
+        /**
+         * Creates a new {@link ComputationContext} instance.
+         */
+        private ComputationContext(ProcessorContext context, K key, V value, long timestamp, ComputationState<K, V> computationState) {
+            this.context = context;
+            this.key = key;
+            this.value = value;
+            this.timestamp = timestamp;
+            this.computationState = computationState;
+        }
+
+        public ProcessorContext getContext() {
+            return context;
+        }
+
+        public K getKey() {
+            return key;
+        }
+
+        public V getValue() {
+            return value;
+        }
+
+        public long getTimestamp() {
+            return timestamp;
+        }
+
+        public ComputationState<K, V> getComputationState() {
+            return computationState;
+        }
+
+        public long getFirstPatternTimestamp() {
+            return computationState.isBeginState() ? timestamp : computationState.getTimestamp();
+        }
+
+        public Event<K, V> getEvent( ) {
+            return new Event<>(key, value, context.timestamp(), context.topic(), context.partition(), context.offset());
+        }
     }
 }
-
-
-

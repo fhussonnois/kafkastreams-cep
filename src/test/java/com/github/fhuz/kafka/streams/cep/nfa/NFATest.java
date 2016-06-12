@@ -18,11 +18,19 @@ import org.apache.kafka.streams.state.internals.MemoryLRUCache;
 import org.junit.Test;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 
 import static org.junit.Assert.*;
 
 public class NFATest {
+
+    private Event<String, String> ev1 = new Event<>(null, "A", System.currentTimeMillis(), "test", 0, 0);
+    private Event<String, String> ev2 = new Event<>(null, "B", System.currentTimeMillis(), "test", 0, 1);
+    private Event<String, String> ev3 = new Event<>(null, "B", System.currentTimeMillis(), "test", 0, 2);
+    private Event<String, String> ev4 = new Event<>(null, "C", System.currentTimeMillis(), "test", 0, 3);
+    private Event<String, String> ev5 = new Event<>(null, "C", System.currentTimeMillis(), "test", 0, 4);
 
     @Test
     public void testNFAWithOneRunAndStrictContiguity() {
@@ -30,27 +38,44 @@ public class NFATest {
         DummyProcessorContext context = new DummyProcessorContext();
         NFA<String, String> nfa = new NFA<>(context, getInMemorySharedBuffer(), states);
 
-        List<Sequence<String, String>> s;
-
-        Event<String, String> ev1 = new Event<>(null, "A", System.currentTimeMillis(), "test", 0, 0);
-        Event<String, String> ev2 = new Event<>(null, "B", System.currentTimeMillis(), "test", 0, 1);
-        Event<String, String> ev3 = new Event<>(null, "C", System.currentTimeMillis(), "test", 0, 2);
-
-        context.set("test", 0, 0L);
-        s = nfa.matchPattern(null, ev1.value, ev1.timestamp);
-        assertTrue(s.isEmpty());
-        context.set("test", 0, 1L);
-        s = nfa.matchPattern(null, ev2.value, ev2.timestamp);
-        assertTrue(s.isEmpty());
-        context.set("test", 0, 2L);
-        s = nfa.matchPattern(null, ev3.value, ev3.timestamp);
+        List<Sequence<String, String>> s = simulate(nfa, context, ev1, ev2, ev4);
         assertEquals(1, s.size());
-        Sequence<String, String> seq = s.get(0);
+        Sequence<String, String> expected = new Sequence<String, String>()
+                .add("first", ev1)
+                .add("second", ev2)
+                .add("latest", ev4);
 
-        assertEquals(3, seq.size());
-        assertNotNull(seq.get("latest").get(0).equals(ev3));
-        assertNotNull(seq.get("second").get(0).equals(ev2));
-        assertNotNull(seq.get("first").get(0).equals(ev1));
+        assertEquals(expected, s.get(0));
+    }
+
+    @Test
+    public void testNFAWithOneRunAndMultipleMatch() {
+        List<State<String, String>> states = new NFAFactory<String, String>().make(getStrictContiguityPatternWithMultipleMatch());
+        DummyProcessorContext context = new DummyProcessorContext();
+        NFA<String, String> nfa = new NFA<>(context, getInMemorySharedBuffer(), states);
+
+        List<Sequence<String, String>> s = simulate(nfa, context, ev1, ev2, ev3, ev4);
+        assertEquals(1, s.size());
+
+        Sequence<String, String> expected = new Sequence<String, String>()
+                .add("first", ev1)
+                .add("second", ev3)
+                .add("second", ev2)
+                .add("latest", ev4);
+
+        assertEquals(expected, s.get(0));
+
+    }
+
+    private List<Sequence<String, String>> simulate(NFA<String, String> nfa, DummyProcessorContext context, Event<String, String>...e) {
+        List<Sequence<String, String>> s = new LinkedList<>();
+        List<Event<String, String>> events = Arrays.asList(e);
+        for(Event<String, String> event : events) {
+            assertTrue(s.isEmpty());
+            context.set(event.topic, event.partition, event.offset);
+            s = nfa.matchPattern(null, event.value, event.timestamp);
+        }
+        return s;
     }
 
     private Pattern<String, String> getStrictContiguityPattern() {
@@ -59,6 +84,17 @@ public class NFATest {
                 .where((key, value, timestamp, store) -> value.equals("A"))
                 .followBy("second")
                 .where((key, value, timestamp, store) -> value.equals("B"))
+                .followBy("latest")
+                .where((key, value, timestamp, store) -> value.equals("C"));
+    }
+
+    private Pattern<String, String> getStrictContiguityPatternWithMultipleMatch() {
+        return new EventSequence<String, String>()
+                .select("first")
+                .where((key, value, timestamp, store) -> value.equals("A"))
+                .followBy("second")
+                .where((key, value, timestamp, store) -> value.equals("B"))
+                .oneOrMore()
                 .followBy("latest")
                 .where((key, value, timestamp, store) -> value.equals("C"));
     }

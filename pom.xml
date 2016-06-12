@@ -38,7 +38,7 @@
             </roles>
         </developer>
     </developers>
-    
+
     <properties>
         <kafka.version>0.10.0.0-cp1</kafka.version>
     </properties>
