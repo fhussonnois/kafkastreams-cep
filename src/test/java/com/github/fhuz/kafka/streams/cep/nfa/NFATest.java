@@ -30,7 +30,7 @@ public class NFATest {
     private Event<String, String> ev2 = new Event<>(null, "B", System.currentTimeMillis(), "test", 0, 1);
     private Event<String, String> ev3 = new Event<>(null, "B", System.currentTimeMillis(), "test", 0, 2);
     private Event<String, String> ev4 = new Event<>(null, "C", System.currentTimeMillis(), "test", 0, 3);
-    private Event<String, String> ev5 = new Event<>(null, "C", System.currentTimeMillis(), "test", 0, 4);
+    private Event<String, String> ev5 = new Event<>(null, "D", System.currentTimeMillis(), "test", 0, 4);
 
     @Test
     public void testNFAWithOneRunAndStrictContiguity() {
@@ -64,7 +64,59 @@ public class NFATest {
                 .add("latest", ev4);
 
         assertEquals(expected, s.get(0));
+    }
 
+
+    @Test
+    public void testNFAWithSkipTilNextMatch() {
+
+        Pattern<String, String> pattern = new EventSequence<String, String>()
+                .select("first")
+                .where((key, value, timestamp, store) -> value.equals("A"))
+                .followBy("second")
+                .where((key, value, timestamp, store) -> value.equals("C"))
+                .withStrategy(Pattern.SelectStrategy.SKIP_TIL_NEXT_MATCH)
+                .followBy("latest")
+                .where((key, value, timestamp, store) -> value.equals("D"));
+
+        List<State<String, String>> states = new NFAFactory<String, String>().make(pattern);
+        DummyProcessorContext context = new DummyProcessorContext();
+        NFA<String, String> nfa = new NFA<>(context, getInMemorySharedBuffer(), states);
+
+        List<Sequence<String, String>> s = simulate(nfa, context, ev1, ev2, ev3, ev4, ev5);
+        assertEquals(1, s.size());
+        Sequence<String, String> expected = new Sequence<String, String>()
+                .add("first", ev1)
+                .add("second", ev4)
+                .add("latest", ev5);
+
+        assertEquals(expected, s.get(0));
+    }
+
+    @Test
+    public void testNFAWithSkipTilAnyMatch() {
+
+        Pattern<String, String> pattern = new EventSequence<String, String>()
+                .select("first")
+                .where((key, value, timestamp, store) -> value.equals("A"))
+                .followBy("second")
+                .where((key, value, timestamp, store) -> value.equals("B"))
+                .withStrategy(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH)
+                .followBy("latest")
+                .where((key, value, timestamp, store) -> value.equals("C"));
+
+        List<State<String, String>> states = new NFAFactory<String, String>().make(pattern);
+        DummyProcessorContext context = new DummyProcessorContext();
+        NFA<String, String> nfa = new NFA<>(context, getInMemorySharedBuffer(), states);
+
+        List<Sequence<String, String>> s = simulate(nfa, context, ev1, ev2, ev3, ev4);
+        assertEquals(1, s.size());
+        Sequence<String, String> expected = new Sequence<String, String>()
+                .add("first", ev1)
+                .add("second", ev4)
+                .add("latest", ev5);
+
+        assertEquals(expected, s.get(0));
     }
 
     private List<Sequence<String, String>> simulate(NFA<String, String> nfa, DummyProcessorContext context, Event<String, String>...e) {

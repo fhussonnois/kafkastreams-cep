@@ -140,6 +140,16 @@ public class State<K, V> implements Serializable, Comparable<State<K, V>> {
         public boolean is(EdgeOperation o) {
             return this.operation.equals(o);
         }
+
+        @Override
+        public String toString() {
+            final StringBuilder sb = new StringBuilder("Edge{");
+            sb.append("operation=").append(operation);
+            sb.append(", predicate=").append(predicate);
+            sb.append(", target=").append(target);
+            sb.append('}');
+            return sb.toString();
+        }
     }
 
     @Override

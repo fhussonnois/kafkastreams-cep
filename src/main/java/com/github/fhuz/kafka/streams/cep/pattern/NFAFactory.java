@@ -75,37 +75,36 @@ public class NFAFactory<K, V> {
         long windowLengthMs = getWindowLengthMs(currentPattern, successorPattern);
         state.setWindow(windowLengthMs); // Pushing the time window early
 
-        if( cardinality.equals(Pattern.Cardinality.MANDATORY) ) {
-            state.addEdge(new State.Edge<>(EdgeOperation.BEGIN, currentPattern.getPredicate(), successorState));
-        } else {
-            final Matcher<K, V> take = currentPattern.getPredicate();
-            state.addEdge(new State.Edge<>(EdgeOperation.TAKE, take, successorState));
+        final Matcher<K, V> predicate = currentPattern.getPredicate();
+        EdgeOperation operation = cardinality.equals(Pattern.Cardinality.ONE) ? EdgeOperation.BEGIN : EdgeOperation.TAKE;
+        state.addEdge(new State.Edge<>(operation, predicate, successorState));
 
-            Pattern.SelectStrategy currentPatternStrategy = currentPattern.getStrategy();
+        Pattern.SelectStrategy currentPatternStrategy = currentPattern.getStrategy();
 
-            Matcher<K, V> ignore = null;
-            // ignore = true
-            if( currentPatternStrategy.equals(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH) ) {
-                ignore = (key, value, ts, store) -> true;
-                state.addEdge(new State.Edge<>(EdgeOperation.IGNORE, ignore, null));
-            }
+        Matcher<K, V> ignore = null;
+        // ignore = true
+        if( currentPatternStrategy.equals(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH) ) {
+            ignore = (key, value, ts, store) -> true;
+            state.addEdge(new State.Edge<>(EdgeOperation.IGNORE, ignore, null));
+        }
 
-            // ignore = !(take)
-            if (currentPatternStrategy.equals(Pattern.SelectStrategy.SKIP_TIL_NEXT_MATCH)) {
-                ignore = Matcher.not(take);
-                state.addEdge(new State.Edge<>(EdgeOperation.IGNORE, ignore, null));
-            }
+        // ignore = !(take)
+        if (currentPatternStrategy.equals(Pattern.SelectStrategy.SKIP_TIL_NEXT_MATCH)) {
+            ignore = Matcher.not(predicate);
+            state.addEdge(new State.Edge<>(EdgeOperation.IGNORE, ignore, null));
+        }
 
+        if( operation.equals(EdgeOperation.TAKE) ) {
             // proceed = successor_begin || (!take && !ignore)
             boolean isStrict = currentPatternStrategy.equals(Pattern.SelectStrategy.STRICT_CONTIGUITY);
             Matcher<K, V> proceed =
-            isStrict ? Matcher.or(successorPattern.getPredicate(), Matcher.not(take)) :
-                    Matcher.or(
-                        successorPattern.getPredicate(),
-                        Matcher.and(Matcher.not(take), Matcher.not(ignore)));
-
+                    isStrict ? Matcher.or(successorPattern.getPredicate(), Matcher.not(predicate)) :
+                            Matcher.or(
+                                    successorPattern.getPredicate(),
+                                    Matcher.and(Matcher.not(predicate), Matcher.not(ignore)));
             state.addEdge(new State.Edge<>(EdgeOperation.PROCEED, proceed, successorState));
         }
+
         // we need to introduce a required state
         if(hasMandatoryState) {
             successorState = state;

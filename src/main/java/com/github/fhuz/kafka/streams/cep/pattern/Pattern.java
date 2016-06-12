@@ -26,7 +26,7 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
         ZERO_OR_MORE(-2),
         ONE_OR_MORE(-1),
         OPTIONAL(0),
-        MANDATORY(1);
+        ONE(1);
 
         private int val;
 
@@ -66,7 +66,7 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
 
     private SelectStrategy strategy;
 
-    private Cardinality cardinality = Cardinality.MANDATORY;
+    private Cardinality cardinality = Cardinality.ONE;
 
     /**
      * Creates a new {@link Pattern} instance.

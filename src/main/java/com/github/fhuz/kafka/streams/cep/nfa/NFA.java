@@ -87,7 +87,7 @@ public class NFA<K, V> implements Serializable {
         while(numberOfStateToProcess-- > 0) {
             ComputationState<K, V> computationState = computationStates.poll();
 
-            Collection<ComputationState<K, V>> states = matchPattern(new ComputationContext<K, V>(this.context, key, value, timestamp, computationState));
+            Collection<ComputationState<K, V>> states = matchPattern(new ComputationContext<>(this.context, key, value, timestamp, computationState));
             if( states.isEmpty() )
                 removePattern(computationState);
             else
@@ -184,8 +184,8 @@ public class NFA<K, V> implements Serializable {
         }
 
         if(isBranching) {
-            State<K, V> epsilonState = newEpsilonState(currentState, currentState);
-            nextComputationStates.add(new ComputationState<>(epsilonState, version.addRun(), currentEvent, ctx.getFirstPatternTimestamp()));
+            State<K, V> epsilonState = newEpsilonState(previousState, currentState);
+            nextComputationStates.add(new ComputationState<>(epsilonState, version.addRun(), computationState.getEvent(), ctx.getFirstPatternTimestamp()));
         }
         return nextComputationStates;
     }
