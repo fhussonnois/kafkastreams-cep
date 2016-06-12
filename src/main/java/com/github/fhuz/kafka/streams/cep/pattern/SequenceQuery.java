@@ -17,12 +17,12 @@
 package com.github.fhuz.kafka.streams.cep.pattern;
 
 
-public class EventSequence<K, V> {
+public class SequenceQuery<K, V> {
 
     /**
-     * Creates a new {@link EventSequence} instance.
+     * Creates a new {@link SequenceQuery} instance.
      */
-    public EventSequence() {
+    public SequenceQuery() {
 
     }
 

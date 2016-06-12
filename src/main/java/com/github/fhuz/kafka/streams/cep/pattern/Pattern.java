@@ -66,6 +66,8 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
 
     private SelectStrategy strategy;
 
+    private String state;
+
     private Cardinality cardinality = Cardinality.ONE;
 
     /**
@@ -90,6 +92,11 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
 
     public Pattern<K, V> withStrategy(SelectStrategy strategy) {
         this.strategy = strategy;
+        return this;
+    }
+
+    public Pattern<K, V> withState(String state) {
+        this.state = state;
         return this;
     }
 

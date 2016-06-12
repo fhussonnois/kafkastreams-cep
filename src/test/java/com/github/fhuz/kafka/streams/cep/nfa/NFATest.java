@@ -4,7 +4,7 @@ import com.github.fhuz.kafka.streams.cep.Event;
 import com.github.fhuz.kafka.streams.cep.Sequence;
 import com.github.fhuz.kafka.streams.cep.State;
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.KVSharedVersionedBuffer;
-import com.github.fhuz.kafka.streams.cep.pattern.EventSequence;
+import com.github.fhuz.kafka.streams.cep.pattern.SequenceQuery;
 import com.github.fhuz.kafka.streams.cep.pattern.NFAFactory;
 import com.github.fhuz.kafka.streams.cep.pattern.Pattern;
 import org.apache.kafka.common.serialization.Serde;
@@ -68,9 +68,9 @@ public class NFATest {
 
 
     @Test
-    public void testNFAWithSkipTilNextMatch() {
+    public void testNFAWithSkipTillNextMatch() {
 
-        Pattern<String, String> pattern = new EventSequence<String, String>()
+        Pattern<String, String> pattern = new SequenceQuery<String, String>()
                 .select("first")
                 .where((key, value, timestamp, store) -> value.equals("A"))
                 .followBy("second")
@@ -94,29 +94,35 @@ public class NFATest {
     }
 
     @Test
-    public void testNFAWithSkipTilAnyMatch() {
+    public void testNFAWithSkipTillAnyMatch() {
 
-        Pattern<String, String> pattern = new EventSequence<String, String>()
+        Pattern<String, String> pattern = new SequenceQuery<String, String>()
                 .select("first")
                 .where((key, value, timestamp, store) -> value.equals("A"))
                 .followBy("second")
                 .where((key, value, timestamp, store) -> value.equals("B"))
                 .withStrategy(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH)
                 .followBy("latest")
-                .where((key, value, timestamp, store) -> value.equals("C"));
+                .where((key, value, timestamp, store) -> value.equals("C"))
+                .withStrategy(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH);
 
         List<State<String, String>> states = new NFAFactory<String, String>().make(pattern);
         DummyProcessorContext context = new DummyProcessorContext();
         NFA<String, String> nfa = new NFA<>(context, getInMemorySharedBuffer(), states);
 
         List<Sequence<String, String>> s = simulate(nfa, context, ev1, ev2, ev3, ev4);
-        assertEquals(1, s.size());
-        Sequence<String, String> expected = new Sequence<String, String>()
+        assertEquals(2, s.size());
+        Sequence<String, String> expected1 = new Sequence<String, String>()
                 .add("first", ev1)
-                .add("second", ev4)
-                .add("latest", ev5);
+                .add("second", ev2)
+                .add("latest", ev4);
 
-        assertEquals(expected, s.get(0));
+        assertEquals(expected1, s.get(0));
+        Sequence<String, String> expected2 = new Sequence<String, String>()
+                .add("first", ev1)
+                .add("second", ev3)
+                .add("latest", ev4);
+        assertEquals(expected2, s.get(1));
     }
 
     private List<Sequence<String, String>> simulate(NFA<String, String> nfa, DummyProcessorContext context, Event<String, String>...e) {
@@ -131,7 +137,7 @@ public class NFATest {
     }
 
     private Pattern<String, String> getStrictContiguityPattern() {
-        return new EventSequence<String, String>()
+        return new SequenceQuery<String, String>()
                 .select("first")
                 .where((key, value, timestamp, store) -> value.equals("A"))
                 .followBy("second")
@@ -141,7 +147,7 @@ public class NFATest {
     }
 
     private Pattern<String, String> getStrictContiguityPatternWithMultipleMatch() {
-        return new EventSequence<String, String>()
+        return new SequenceQuery<String, String>()
                 .select("first")
                 .where((key, value, timestamp, store) -> value.equals("A"))
                 .followBy("second")
