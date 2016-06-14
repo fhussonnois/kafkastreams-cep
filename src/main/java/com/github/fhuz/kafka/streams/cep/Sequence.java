@@ -62,7 +62,8 @@ public class Sequence<K, V> {
         for(Map.Entry<String, List<Event<K, V>>> entry : sequence.entrySet()) {
             List<? extends Event<?, ?>> events = that.get(entry.getKey());
             if( events == null) return false;
-            if( ! entry.getValue().equals(events) ) return false;
+            if( ! (entry.getValue().size() == events.size() && entry.getValue().containsAll(events))  )
+                return false;
         }
 
         return true;

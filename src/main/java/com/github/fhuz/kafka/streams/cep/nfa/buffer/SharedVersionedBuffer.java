@@ -17,7 +17,7 @@
 package com.github.fhuz.kafka.streams.cep.nfa.buffer;
 
 import com.github.fhuz.kafka.streams.cep.Sequence;
-import com.github.fhuz.kafka.streams.cep.State;
+import com.github.fhuz.kafka.streams.cep.nfa.Stage;
 import com.github.fhuz.kafka.streams.cep.nfa.DeweyVersion;
 import com.github.fhuz.kafka.streams.cep.Event;
 
@@ -31,39 +31,44 @@ public interface SharedVersionedBuffer<K , V> {
     /**
      * Adds a new event match into this shared buffer.
      *
-     * @param currState the state for which the event must be added.
+     * @param currStage the state for which the event must be added.
      * @param currEvent the current event to add.
-     * @param prevState the predecessor state.
+     * @param prevStage the predecessor state.
      * @param prevEvent the predecessor event.
      * @param version the predecessor version.
      */
-    void put(State<K, V> currState, Event<K, V> currEvent, State<K, V> prevState, Event<K, V> prevEvent, DeweyVersion version);
+    void put(Stage<K, V> currStage, Event<K, V> currEvent, Stage<K, V> prevStage, Event<K, V> prevEvent, DeweyVersion version);
 
     /**
      * Adds a new event match into this shared buffer.
      *
-     * @param state the state on which the event match.
+     * @param stage the state on which the event match.
      * @param evt the event.
      * @param version the dewey version attached to this match.
      */
-    void put(State<K, V> state, Event<K, V> evt, DeweyVersion version);
+    void put(Stage<K, V> stage, Event<K, V> evt, DeweyVersion version);
 
     /**
      * Retrieves the complete event sequence for the specified final event.
      *
-     * @param state the final state of the sequence.
+     * @param stage the final state of the sequence.
      * @param event the final event of the sequence.
      * @param version the final dewey version of the sequence.
      * @return a new {@link Sequence} instance.
      */
-    Sequence<K, V> get(final State<K, V> state, final Event<K, V> event, final DeweyVersion version);
+    Sequence<K, V> get(final Stage<K, V> stage, final Event<K, V> event, final DeweyVersion version);
 
     /**
      * Remove all events attached to a sequence.
      *
-     * @param state the final state of the sequence.
+     * @param stage the final state of the sequence.
      * @param event the final event of the sequence.
      * @param version the final dewey version of the sequence.
+     *
+     * @return the previous sequence associated with state, event and version, or null if there was no sequence for that.
      */
-    void remove(final State<K, V> state, final Event<K, V> event, final DeweyVersion version);
+    Sequence<K, V> remove(final Stage<K, V> stage, final Event<K, V> event, final DeweyVersion version);
+
+
+    void branch(Stage<K, V> stage, Event<K, V> event, DeweyVersion version);
 }

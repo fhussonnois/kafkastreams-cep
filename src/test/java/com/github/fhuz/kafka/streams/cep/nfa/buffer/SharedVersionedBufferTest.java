@@ -1,7 +1,7 @@
 package com.github.fhuz.kafka.streams.cep.nfa.buffer;
 
 import com.github.fhuz.kafka.streams.cep.Sequence;
-import com.github.fhuz.kafka.streams.cep.State;
+import com.github.fhuz.kafka.streams.cep.nfa.Stage;
 import com.github.fhuz.kafka.streams.cep.nfa.DeweyVersion;
 import com.github.fhuz.kafka.streams.cep.Event;
 import org.apache.kafka.streams.state.KeyValueStore;
@@ -20,9 +20,9 @@ public class SharedVersionedBufferTest {
     private static Event<String, String> ev4 = new Event<>("k4", "v4", 1000000004L, "topic-test", 0, 3L);
     private static Event<String, String> ev5 = new Event<>("k5", "v5", 1000000005L, "topic-test", 0, 4L);
 
-    private static State<String, String> first  = new State<>("first", State.StateType.BEGIN);
-    private static State<String, String> second = new State<>("second", State.StateType.NORMAL);
-    private static State<String, String> latest = new State<>("latest", State.StateType.FINAL);
+    private static Stage<String, String> first  = new Stage<>("first", Stage.StateType.BEGIN);
+    private static Stage<String, String> second = new Stage<>("second", Stage.StateType.NORMAL);
+    private static Stage<String, String> latest = new Stage<>("latest", Stage.StateType.FINAL);
 
     @Test
     public void testExtractPatternsWithOneRun() {
@@ -68,10 +68,7 @@ public class SharedVersionedBufferTest {
 
     @SuppressWarnings("unchecked")
     private <K, V> KVSharedVersionedBuffer<K, V> getInMemorySharedBuffer() {
-        KeyValueStore<StackEventKey, TimedKeyValue> store = new MemoryLRUCache<>("test", 100);
+        KeyValueStore<StackEventKey<K, V>, TimedKeyValue<K, V>> store = new MemoryLRUCache<>("test", 100);
         return new KVSharedVersionedBuffer<>(store);
     }
-
-
-
 }

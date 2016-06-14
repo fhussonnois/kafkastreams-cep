@@ -17,6 +17,7 @@
 package com.github.fhuz.kafka.streams.cep;
 
 import com.github.fhuz.kafka.streams.cep.nfa.NFA;
+import com.github.fhuz.kafka.streams.cep.nfa.Stage;
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.KVSharedVersionedBuffer;
 import com.github.fhuz.kafka.streams.cep.pattern.NFAFactory;
 import com.github.fhuz.kafka.streams.cep.pattern.Pattern;
@@ -52,10 +53,10 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
         this.context = context;
 
         NFAFactory<K, V> fact = new NFAFactory<>();
-        List<State<K, V>> states = fact.make(pattern);
+        List<Stage<K, V>> stages = fact.make(pattern);
 
         KVSharedVersionedBuffer<K, V> buffer = KVSharedVersionedBuffer.<K, V>getFactory().make(context);
-        this.processor = new NFA<>(context, buffer, states);
+        this.processor = new NFA<>(context, buffer, stages);
     }
 
     public static StateStoreSupplier getEventsStore(boolean isMemory) {

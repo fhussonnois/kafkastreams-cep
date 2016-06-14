@@ -17,7 +17,7 @@
 package com.github.fhuz.kafka.streams.cep.nfa.buffer;
 
 import com.github.fhuz.kafka.streams.cep.Sequence;
-import com.github.fhuz.kafka.streams.cep.State;
+import com.github.fhuz.kafka.streams.cep.nfa.Stage;
 import com.github.fhuz.kafka.streams.cep.nfa.DeweyVersion;
 import com.github.fhuz.kafka.streams.cep.Event;
 import org.apache.kafka.streams.processor.ProcessorContext;
@@ -28,10 +28,8 @@ import org.apache.kafka.streams.state.KeyValueStore;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A shared version buffer implementation based on Kafka Streams {@link KeyValueStore}.
@@ -40,7 +38,7 @@ import java.util.Objects;
  */
 public class KVSharedVersionedBuffer<K , V> implements SharedVersionedBuffer<K, V> {
 
-    private KeyValueStore<StackEventKey, TimedKeyValue> store;
+    private KeyValueStore<StackEventKey<K, V>, TimedKeyValue<K, V>> store;
 
     public static <K, V> Factory<K, V> getFactory() {
         return new Factory<>();
@@ -51,17 +49,17 @@ public class KVSharedVersionedBuffer<K , V> implements SharedVersionedBuffer<K, 
         public static final String STATE_NAME = "_cep_sharedbuffer_events";
 
         public KVSharedVersionedBuffer<K, V> make(ProcessorContext context) {
-            KeyValueStore<StackEventKey, TimedKeyValue> store = getStateStore(context);
+            KeyValueStore<StackEventKey<K, V>, TimedKeyValue<K, V>> store = getStateStore(context);
             return new KVSharedVersionedBuffer<>(store);
         }
 
         @SuppressWarnings("unchecked")
-        private KeyValueStore<StackEventKey, TimedKeyValue> getStateStore(ProcessorContext context) {
+        private KeyValueStore<StackEventKey<K, V>, TimedKeyValue<K, V>> getStateStore(ProcessorContext context) {
             StateStore store = context.getStateStore(STATE_NAME);
             if(store == null) {
                 throw new IllegalStateException("No state store registered with name " + STATE_NAME);
             }
-            return (KeyValueStore<StackEventKey, TimedKeyValue>) context.getStateStore(STATE_NAME);
+            return (KeyValueStore<StackEventKey<K, V>, TimedKeyValue<K, V>>) context.getStateStore(STATE_NAME);
         }
     }
 
@@ -71,24 +69,24 @@ public class KVSharedVersionedBuffer<K , V> implements SharedVersionedBuffer<K, 
      * @param store the kafka processor context.
      */
     @SuppressWarnings("unchecked")
-    public KVSharedVersionedBuffer(KeyValueStore<StackEventKey, TimedKeyValue> store) {
+    public KVSharedVersionedBuffer(KeyValueStore<StackEventKey<K, V>, TimedKeyValue<K, V>> store) {
         this.store = store;
     }
 
     /**
      * Add a new event into the shared buffer.
      *
-     * @param currState the state for which the event must be added.
+     * @param currStage the state for which the event must be added.
      * @param currEvent the current event to add.
-     * @param prevState the predecessor state.
+     * @param prevStage the predecessor state.
      * @param prevEvent the predecessor event.
      * @param version the predecessor version.
      */
     @SuppressWarnings("unchecked")
     @Override
-    public void put(State<K, V> currState, Event<K, V> currEvent, State<K, V> prevState, Event<K, V> prevEvent, DeweyVersion version) {
-        StateKey currStateKey = new StateKey(currState.getName(), currState.getType());
-        StateKey prevStateKey = new StateKey(prevState.getName(), prevState.getType());
+    public void put(Stage<K, V> currStage, Event<K, V> currEvent, Stage<K, V> prevStage, Event<K, V> prevEvent, DeweyVersion version) {
+        StateKey currStateKey = new StateKey(currStage.getName(), currStage.getType());
+        StateKey prevStateKey = new StateKey(prevStage.getName(), prevStage.getType());
         StackEventKey prevEventKey = new StackEventKey(prevStateKey, prevEvent.topic, prevEvent.partition, prevEvent.offset);
         StackEventKey currEventKey = new StackEventKey(currStateKey, currEvent.topic, currEvent.partition, currEvent.offset);
 
@@ -105,11 +103,26 @@ public class KVSharedVersionedBuffer<K , V> implements SharedVersionedBuffer<K, 
         this.store.put(currEventKey, sharedCurrEvent);
     }
 
+    public void branch(Stage<K, V> stage, Event<K, V> event, DeweyVersion version) {
+        StackEventKey<K, V> key = newStackEventKey(stage, event);
+        Pointer<K, V> pointer = new Pointer<>(version, key);
+        while(pointer != null && pointer.key != null) {
+            final TimedKeyValue<K, V> val = this.store.get(pointer.key);
+            val.incrementRefAndGet();
+            if( this.store.persistent() )
+                this.store.put(key, val);
+            pointer = val.getPointerByVersion(pointer.version);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     @SuppressWarnings("unchecked")
     @Override
-    public void put(State<K, V> state, Event<K, V> evt, DeweyVersion version) {
+    public void put(Stage<K, V> stage, Event<K, V> evt, DeweyVersion version) {
 
-        StateKey stateKey = new StateKey(state.getName(), state.getType());
+        StateKey stateKey = new StateKey(stage.getName(), stage.getType());
 
         // A TimedKeyValue can only by add once to a stack, so there is no need to check for existence.
         TimedKeyValue<K, V> eventValue = new TimedKeyValue<>(evt.key, evt.value, evt.timestamp);
@@ -120,30 +133,51 @@ public class KVSharedVersionedBuffer<K , V> implements SharedVersionedBuffer<K, 
         this.store.put(eventKey, eventValue);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @SuppressWarnings("unchecked")
     @Override
-    public Sequence<K, V> get(final State<K, V> state, final Event<K, V> event, final DeweyVersion version) {
+    public Sequence<K, V> get(final Stage<K, V> stage, final Event<K, V> event, final DeweyVersion version) {
+        return peek(stage, event, version, false);
+    }
 
-        Pointer<K, V> pointer = new Pointer<>(version, newStackEventKey(state, event));
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Sequence<K, V> remove(final Stage<K, V> stage, final Event<K, V> event, final DeweyVersion version) {
+        return peek(stage, event, version, true);
+    }
+
+    public Sequence<K, V> peek(Stage<K, V> stage, Event<K, V> event, DeweyVersion version, boolean remove) {
+        Pointer<K, V> pointer = new Pointer<>(version, newStackEventKey(stage, event));
 
         Sequence<K, V> sequence = new Sequence<>();
+
         while(pointer != null && pointer.key != null) {
-            final StackEventKey<K, V> stateKey  = pointer.key;
+            final StackEventKey<K, V> stateKey = pointer.key;
             final TimedKeyValue<K, V> stateValue = this.store.get(stateKey);
+
+            long refsLeft = stateValue.decrementRefAndGet();
+            if (remove && refsLeft == 0 && stateValue.getPredecessors().size() <= 1) {
+                store.delete(stateKey);
+            }
 
             sequence.add(stateKey.state.name, newEvent(stateKey, stateValue));
             pointer = stateValue.getPointerByVersion(pointer.version);
+
+            if( remove && pointer != null && refsLeft == 0) {
+                stateValue.removePredecessor(pointer);
+                if( store.persistent() )
+                    store.put(stateKey, stateValue);
+            }
         }
         return sequence;
     }
 
-    @Override
-    public void remove(State<K, V> state, Event<K, V> event, DeweyVersion version) {
-
-    }
-
-    private StackEventKey<K, V> newStackEventKey(State<K, V> state, Event<K, V> event) {
-        return new StackEventKey<>(new StateKey(state.getName(), state.getType()), event.topic, event.partition, event.offset);
+    private StackEventKey<K, V> newStackEventKey(Stage<K, V> stage, Event<K, V> event) {
+        return new StackEventKey<>(new StateKey(stage.getName(), stage.getType()), event.topic, event.partition, event.offset);
     }
 
     private Event<K, V> newEvent(StackEventKey<K, V> stateKey, TimedKeyValue<K, V> stateValue) {
@@ -160,6 +194,7 @@ public class KVSharedVersionedBuffer<K , V> implements SharedVersionedBuffer<K, 
         private long timestamp;
         private K key;
         private V value;
+        private AtomicLong refs = new AtomicLong(1);
 
         private Collection<Pointer<K, V>> predecessors;
 
@@ -175,6 +210,18 @@ public class KVSharedVersionedBuffer<K , V> implements SharedVersionedBuffer<K, 
             this.predecessors = null;
         }
 
+        public void setRef(long ref) {
+            this.refs.set(ref);
+        }
+
+        public long incrementRefAndGet() {
+            return this.refs.incrementAndGet();
+        }
+
+        public long decrementRefAndGet() {
+            return this.refs.get() == 0 ? 0 : this.refs.decrementAndGet();
+        }
+
         public long getTimestamp() {
             return timestamp;
         }
@@ -185,6 +232,10 @@ public class KVSharedVersionedBuffer<K , V> implements SharedVersionedBuffer<K, 
 
         public V getValue() {
             return value;
+        }
+
+        public void removePredecessor(Pointer<K, V> pointer) {
+            this.predecessors.remove(pointer);
         }
 
         public Collection<Pointer<K, V>> getPredecessors() {
@@ -256,6 +307,7 @@ public class KVSharedVersionedBuffer<K , V> implements SharedVersionedBuffer<K, 
         private int partition;
         private long offset;
 
+
         /**
          * Dummy constructor required by Kryo.
          */
@@ -307,11 +359,11 @@ public class KVSharedVersionedBuffer<K , V> implements SharedVersionedBuffer<K, 
     public static class StateKey implements Serializable, Comparable<StateKey> {
 
         private String name;
-        private State.StateType type;
+        private Stage.StateType type;
 
         public StateKey(){}
 
-        public StateKey(String name, State.StateType type) {
+        public StateKey(String name, Stage.StateType type) {
             this.name = name;
             this.type = type;
         }

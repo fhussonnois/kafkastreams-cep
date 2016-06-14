@@ -137,6 +137,8 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
         return this;
     }
 
+    String getState() { return this.state; }
+
     Cardinality getCardinality() {
         return cardinality;
     }

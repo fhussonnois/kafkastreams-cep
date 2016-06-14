@@ -17,10 +17,10 @@
 package com.github.fhuz.kafka.streams.cep.nfa;
 
 import com.github.fhuz.kafka.streams.cep.Event;
-import com.github.fhuz.kafka.streams.cep.State;
 import com.github.fhuz.kafka.streams.cep.Sequence;
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.KVSharedVersionedBuffer;
 import org.apache.kafka.streams.processor.ProcessorContext;
+import org.apache.kafka.streams.processor.StateStore;
 import org.slf4j.Logger;
 
 import java.io.Serializable;
@@ -45,32 +45,32 @@ public class NFA<K, V> implements Serializable {
 
     private KVSharedVersionedBuffer<K, V> sharedVersionedBuffer;
 
-    private Collection<State<K, V>> states;
+    private Collection<Stage<K, V>> stages;
 
-    private Queue<ComputationState<K, V>> computationStates;
+    private Queue<ComputationStage<K, V>> computationStages;
 
     private transient ProcessorContext context;
 
     /**
      * Creates a new {@link NFA} instance.
      */
-    public NFA(ProcessorContext context, KVSharedVersionedBuffer<K, V> buffer, Collection<State<K, V>> states) {
-        this.states = states;
+    public NFA(ProcessorContext context, KVSharedVersionedBuffer<K, V> buffer, Collection<Stage<K, V>> stages) {
+        this.stages = stages;
         this.context = context;
-        this.computationStates = new LinkedBlockingQueue<>();
+        this.computationStages = new LinkedBlockingQueue<>();
         this.sharedVersionedBuffer = buffer;
-        initComputationStates(states);
+        initComputationStates(stages);
     }
 
-    private void initComputationStates(Collection<State<K, V>> states) {
-        states.forEach(s -> {
+    private void initComputationStates(Collection<Stage<K, V>> stages) {
+        stages.forEach(s -> {
             if (s.isBeginState())
-                computationStates.add(new ComputationState<>(s, new DeweyVersion(1)));
+                computationStages.add(new ComputationStage<>(s, new DeweyVersion(1)));
         });
     }
 
-    public Collection<State<K, V>> getStates() {
-        return states;
+    public Collection<Stage<K, V>> getStages() {
+        return stages;
     }
 
     /**
@@ -82,132 +82,135 @@ public class NFA<K, V> implements Serializable {
      */
     public List<Sequence<K, V>> matchPattern(K key, V value, long timestamp) {
 
-        int numberOfStateToProcess = computationStates.size();
-        List<Sequence<K, V>> sequences = new LinkedList<>();
-        while(numberOfStateToProcess-- > 0) {
-            ComputationState<K, V> computationState = computationStates.poll();
+        int numberOfStateToProcess = computationStages.size();
 
-            Collection<ComputationState<K, V>> states = matchPattern(new ComputationContext<>(this.context, key, value, timestamp, computationState));
+        List<ComputationStage<K, V>> finalStates = new LinkedList<>();
+        while(numberOfStateToProcess-- > 0) {
+            ComputationStage<K, V> computationStage = computationStages.poll();
+            Collection<ComputationStage<K, V>> states = matchPattern(new ComputationContext<>(this.context, key, value, timestamp, computationStage));
             if( states.isEmpty() )
-                removePattern(computationState);
+                removePattern(computationStage);
             else
-                sequences.addAll(matchConstruction(states));
-            computationStates.addAll(getAllNonFinalStates(states));
+                finalStates.addAll(getAllFinalStates(states));
+            computationStages.addAll(getAllNonFinalStates(states));
         }
-        return sequences;
+        return matchConstruction(finalStates);
     }
 
-    private List<Sequence<K, V>> matchConstruction(Collection<ComputationState<K, V>> states) {
-        return getAllFinalStates(states)
-                .stream()
-                .map(c -> sharedVersionedBuffer.get(c.getState(), c.getEvent(), c.getVersion()))
+    private List<Sequence<K, V>> matchConstruction(Collection<ComputationStage<K, V>> states) {
+        return  states.stream()
+                .map(c -> sharedVersionedBuffer.remove(c.getStage(), c.getEvent(), c.getVersion()))
                 .collect(Collectors.toList());
     }
 
-    private void removePattern(ComputationState<K, V> computationState) {
+    private void removePattern(ComputationStage<K, V> computationStage) {
         sharedVersionedBuffer.remove(
-                computationState.getState(),
-                computationState.getEvent(),
-                computationState.getVersion()
+                computationStage.getStage(),
+                computationStage.getEvent(),
+                computationStage.getVersion()
         );
     }
 
-    private List<ComputationState<K, V>> getAllNonFinalStates(Collection<ComputationState<K, V>> states) {
+    private List<ComputationStage<K, V>> getAllNonFinalStates(Collection<ComputationStage<K, V>> states) {
         return states
                 .stream()
                 .filter(c -> !c.isForwardingToFinalState())
                 .collect(Collectors.toList());
     }
 
-    private List<ComputationState<K, V>> getAllFinalStates(Collection<ComputationState<K, V>> states) {
+    private List<ComputationStage<K, V>> getAllFinalStates(Collection<ComputationStage<K, V>> states) {
         return states
                 .stream()
-                .filter(ComputationState::isForwardingToFinalState)
+                .filter(ComputationStage::isForwardingToFinalState)
                 .collect(Collectors.toList());
     }
 
-    private Collection<ComputationState<K, V>> matchPattern(ComputationContext<K, V> ctx) {
-        Collection<ComputationState<K, V>> nextComputationStates = new ArrayList<>();
+    private Collection<ComputationStage<K, V>> matchPattern(ComputationContext<K, V> ctx) {
+        Collection<ComputationStage<K, V>> nextComputationStages = new ArrayList<>();
 
         // Checks the time window of the current state.
-        if( !ctx.getComputationState().isBeginState() && ctx.getComputationState().isOutOfWindow(ctx.getTimestamp()) )
-            return nextComputationStates;
+        if( !ctx.getComputationStage().isBeginState() && ctx.getComputationStage().isOutOfWindow(ctx.getTimestamp()) )
+            return nextComputationStages;
 
-        nextComputationStates = evaluate(ctx, ctx.getComputationState().getState(), null);
+        nextComputationStages = evaluate(ctx, ctx.getComputationStage().getStage(), null);
 
         // Begin state should always be re-add to allow multiple runs.
-        if(ctx.getComputationState().isBeginState() && !ctx.getComputationState().isForwarding()) {
-            DeweyVersion version = ctx.getComputationState().getVersion();
-            DeweyVersion newVersion = (nextComputationStates.isEmpty()) ? version : version.addRun();
-            nextComputationStates.add(new ComputationState<>(ctx.getComputationState().getState(), newVersion));
+        if(ctx.getComputationStage().isBeginState() && !ctx.getComputationStage().isForwarding()) {
+            DeweyVersion version = ctx.getComputationStage().getVersion();
+            DeweyVersion newVersion = (nextComputationStages.isEmpty()) ? version : version.addRun();
+            nextComputationStages.add(new ComputationStage<>(ctx.getComputationStage().getStage(), newVersion));
         }
 
-        return nextComputationStates;
+        return nextComputationStages;
     }
 
-    private Collection<ComputationState<K, V>> evaluate(ComputationContext<K, V> ctx, State<K, V> currentState, State<K, V> previousState) {
-        ComputationState<K, V> computationState = ctx.computationState;
-        final Event<K, V> previousEvent = computationState.getEvent();
-        final DeweyVersion version      = computationState.getVersion();
+    private Collection<ComputationStage<K, V>> evaluate(ComputationContext<K, V> ctx, Stage<K, V> currentStage, Stage<K, V> previousStage) {
+        ComputationStage<K, V> computationStage = ctx.computationStage;
+        final Event<K, V> previousEvent = computationStage.getEvent();
+        final DeweyVersion version      = computationStage.getVersion();
 
-        List<State.Edge<K, V>> matchedEdges = matchEdgesAndGet(ctx.key, ctx.value, ctx.timestamp, currentState);
+        List<Stage.Edge<K, V>> matchedEdges = matchEdgesAndGet(ctx.key, ctx.value, ctx.timestamp, currentStage);
 
-        Collection<ComputationState<K, V>> nextComputationStates = new ArrayList<>();
+        Collection<ComputationStage<K, V>> nextComputationStages = new ArrayList<>();
         final boolean isBranching = isBranching(matchedEdges);
         Event<K, V> currentEvent = ctx.getEvent();
-        for(State.Edge<K, V> e : matchedEdges) {
-            State<K, V> epsilonState = newEpsilonState(currentState, e.getTarget());
+        for(Stage.Edge<K, V> e : matchedEdges) {
+            Stage<K, V> epsilonStage = newEpsilonState(currentStage, e.getTarget());
             switch (e.getOperation()) {
                 case PROCEED:
-                    nextComputationStates.addAll(evaluate(ctx, e.getTarget(), currentState));
+                    nextComputationStages.addAll(evaluate(ctx, e.getTarget(), currentStage));
                     break;
                 case TAKE :
                     if( ! isBranching ) {
-                        nextComputationStates.add(computationState.setEvent(currentEvent));
-                        sharedVersionedBuffer.put(currentState, currentEvent, previousState, previousEvent, version);
+                        nextComputationStages.add(computationStage.setEvent(currentEvent));
+                        sharedVersionedBuffer.put(currentStage, currentEvent, previousStage, previousEvent, version);
                     } else {
-                        sharedVersionedBuffer.put(currentState, currentEvent, version.addRun());
+                        sharedVersionedBuffer.put(currentStage, currentEvent, version.addRun());
                     }
+                    if( computationStage.isBranching() ) sharedVersionedBuffer.branch(previousStage, previousEvent, version);
                     break;
                 case BEGIN :
-                    if( previousState != null)
-                        sharedVersionedBuffer.put(currentState, currentEvent, previousState, previousEvent, version);
+                    if( previousStage != null)
+                        sharedVersionedBuffer.put(currentStage, currentEvent, previousStage, previousEvent, version);
                     else
-                        sharedVersionedBuffer.put(currentState, currentEvent, version);
-                    nextComputationStates.add(new ComputationState<>(epsilonState, version.addStage(), currentEvent, ctx.getFirstPatternTimestamp()));
+                        sharedVersionedBuffer.put(currentStage, currentEvent, version);
+                    nextComputationStages.add(new ComputationStage<>(epsilonStage, version.addStage(), currentEvent, ctx.getFirstPatternTimestamp()));
+                    if( computationStage.isBranching() ) sharedVersionedBuffer.branch(previousStage, previousEvent, version);
                     break;
                 case IGNORE:
                     if(!isBranching)
-                        nextComputationStates.add(computationState);
+                        nextComputationStages.add(computationStage);
                     break;
             }
         }
-
         if(isBranching) {
-            State<K, V> epsilonState = newEpsilonState(previousState, currentState);
-            nextComputationStates.add(new ComputationState<>(epsilonState, version.addRun(), computationState.getEvent(), ctx.getFirstPatternTimestamp()));
+            Stage<K, V> epsilonStage = newEpsilonState(previousStage, currentStage);
+            ComputationStage<K, V> newStage = new ComputationStage<>(epsilonStage, version.addRun(), computationStage.getEvent(), ctx.getFirstPatternTimestamp());
+            newStage.setBranching(true);
+            nextComputationStages.add(newStage);
         }
-        return nextComputationStates;
+        return nextComputationStages;
     }
 
-    private List<State.Edge<K, V>> matchEdgesAndGet(K key, V value, long timestamp, State<K, V> currentState) {
-        return currentState.getEdges()
+    private List<Stage.Edge<K, V>> matchEdgesAndGet(K key, V value, long timestamp, Stage<K, V> currentStage) {
+        final StateStore stateStore = currentStage.getState() != null ? context.getStateStore(currentStage.getState()) : null;
+        return currentStage.getEdges()
                 .stream()
-                .filter(e -> e.matches(key, value, timestamp))
+                .filter(e -> e.matches(key, value, timestamp, stateStore))
                 .collect(Collectors.toList());
     }
 
-    private State<K, V> newEpsilonState(State<K, V> current, State<K, V> target) {
-        State<K, V> newState = new State<>(current.getName(), current.getType());
-        newState.addEdge(new State.Edge<>(EdgeOperation.PROCEED, (k, v,t, s) -> true, target));
+    private Stage<K, V> newEpsilonState(Stage<K, V> current, Stage<K, V> target) {
+        Stage<K, V> newStage = new Stage<>(current.getName(), current.getType());
+        newStage.addEdge(new Stage.Edge<>(EdgeOperation.PROCEED, (k, v, t, s) -> true, target));
 
-        return newState;
+        return newStage;
     }
 
-    private boolean isBranching(Collection<State.Edge<K, V>> edges) {
+    private boolean isBranching(Collection<Stage.Edge<K, V>> edges) {
         List<EdgeOperation> matchedOperations = edges
                 .stream()
-                .map(State.Edge::getOperation)
+                .map(Stage.Edge::getOperation)
                 .collect(Collectors.toList());
         return matchedOperations.containsAll(Arrays.asList(EdgeOperation.PROCEED, EdgeOperation.TAKE) )  // allowed with multiple match
                 || matchedOperations.containsAll(Arrays.asList(EdgeOperation.IGNORE, EdgeOperation.TAKE) ) // allowed by skip-till-any-match
@@ -238,17 +241,17 @@ public class NFA<K, V> implements Serializable {
         /**
          * The current state to compute.
          */
-        private final ComputationState<K, V> computationState;
+        private final ComputationStage<K, V> computationStage;
 
         /**
          * Creates a new {@link ComputationContext} instance.
          */
-        private ComputationContext(ProcessorContext context, K key, V value, long timestamp, ComputationState<K, V> computationState) {
+        private ComputationContext(ProcessorContext context, K key, V value, long timestamp, ComputationStage<K, V> computationStage) {
             this.context = context;
             this.key = key;
             this.value = value;
             this.timestamp = timestamp;
-            this.computationState = computationState;
+            this.computationStage = computationStage;
         }
 
         public ProcessorContext getContext() {
@@ -267,12 +270,12 @@ public class NFA<K, V> implements Serializable {
             return timestamp;
         }
 
-        public ComputationState<K, V> getComputationState() {
-            return computationState;
+        public ComputationStage<K, V> getComputationStage() {
+            return computationStage;
         }
 
         public long getFirstPatternTimestamp() {
-            return computationState.isBeginState() ? timestamp : computationState.getTimestamp();
+            return computationStage.isBeginState() ? timestamp : computationStage.getTimestamp();
         }
 
         public Event<K, V> getEvent( ) {

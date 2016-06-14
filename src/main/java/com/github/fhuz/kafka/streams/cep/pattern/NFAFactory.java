@@ -16,7 +16,7 @@
  */
 package com.github.fhuz.kafka.streams.cep.pattern;
 
-import com.github.fhuz.kafka.streams.cep.State;
+import com.github.fhuz.kafka.streams.cep.nfa.Stage;
 import com.github.fhuz.kafka.streams.cep.nfa.EdgeOperation;
 import com.github.fhuz.kafka.streams.cep.nfa.NFA;
 
@@ -38,46 +38,48 @@ public class NFAFactory<K, V> {
      * @param pattern the pattern to make.
      * @return a new {@link NFA} instance.
      */
-    public List<State<K, V>> make(Pattern<K, V> pattern) {
+    public List<Stage<K, V>> make(Pattern<K, V> pattern) {
         if( pattern == null) throw new NullPointerException("Cannot make null pattern");
 
-        List<State<K, V>> sequence = new ArrayList<>();
+        List<Stage<K, V>> sequence = new ArrayList<>();
 
-        State<K, V> successorState     = new State<>("$final", State.StateType.FINAL);
-        sequence.add(successorState);
+        Stage<K, V> successorStage = new Stage<>("$final", Stage.StateType.FINAL);
+        sequence.add(successorStage);
 
         Pattern<K, V> successorPattern = null;
         Pattern<K, V> currentPattern   = pattern;
 
         while( currentPattern.getAncestor() != null) {
-            successorState = buildState(State.StateType.NORMAL, currentPattern, successorState, successorPattern);
-            sequence.add(successorState);
+            successorStage = buildState(Stage.StateType.NORMAL, currentPattern, successorStage, successorPattern);
+            sequence.add(successorStage);
             successorPattern = currentPattern;
             currentPattern = currentPattern.getAncestor();
         }
 
-        State<K, V> beginState = buildState(State.StateType.BEGIN, currentPattern, successorState, successorPattern);
-        sequence.add(beginState);
+        Stage<K, V> beginStage = buildState(Stage.StateType.BEGIN, currentPattern, successorStage, successorPattern);
+        sequence.add(beginStage);
 
         return sequence;
     }
 
-    private State<K, V> buildState(State.StateType type, Pattern<K, V> currentPattern, State<K, V> successorState, Pattern<K, V> successorPattern) {
+    private Stage<K, V> buildState(Stage.StateType type, Pattern<K, V> currentPattern, Stage<K, V> successorStage, Pattern<K, V> successorPattern) {
 
         Pattern.Cardinality cardinality = currentPattern.getCardinality();
-        State.StateType currentType = type;
+        Stage.StateType currentType = type;
 
         boolean hasMandatoryState = cardinality.equals(Pattern.Cardinality.ONE_OR_MORE);
 
-        if(hasMandatoryState) currentType = State.StateType.NORMAL;
+        if(hasMandatoryState) currentType = Stage.StateType.NORMAL;
 
-        State<K, V> state = new State<>(currentPattern.getName(),currentType);
+        Stage<K, V> stage = new Stage<>(currentPattern.getName(),currentType);
         long windowLengthMs = getWindowLengthMs(currentPattern, successorPattern);
-        state.setWindow(windowLengthMs); // Pushing the time window early
+        stage.setWindow(windowLengthMs); // Pushing the time window early
+
+        stage.setState(currentPattern.getState());
 
         final Matcher<K, V> predicate = currentPattern.getPredicate();
         EdgeOperation operation = cardinality.equals(Pattern.Cardinality.ONE) ? EdgeOperation.BEGIN : EdgeOperation.TAKE;
-        state.addEdge(new State.Edge<>(operation, predicate, successorState));
+        stage.addEdge(new Stage.Edge<>(operation, predicate, successorStage));
 
         Pattern.SelectStrategy currentPatternStrategy = currentPattern.getStrategy();
 
@@ -85,13 +87,13 @@ public class NFAFactory<K, V> {
         // ignore = true
         if( currentPatternStrategy.equals(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH) ) {
             ignore = (key, value, ts, store) -> true;
-            state.addEdge(new State.Edge<>(EdgeOperation.IGNORE, ignore, null));
+            stage.addEdge(new Stage.Edge<>(EdgeOperation.IGNORE, ignore, null));
         }
 
         // ignore = !(take)
         if (currentPatternStrategy.equals(Pattern.SelectStrategy.SKIP_TIL_NEXT_MATCH)) {
             ignore = Matcher.not(predicate);
-            state.addEdge(new State.Edge<>(EdgeOperation.IGNORE, ignore, null));
+            stage.addEdge(new Stage.Edge<>(EdgeOperation.IGNORE, ignore, null));
         }
 
         if( operation.equals(EdgeOperation.TAKE) ) {
@@ -102,19 +104,19 @@ public class NFAFactory<K, V> {
                             Matcher.or(
                                     successorPattern.getPredicate(),
                                     Matcher.and(Matcher.not(predicate), Matcher.not(ignore)));
-            state.addEdge(new State.Edge<>(EdgeOperation.PROCEED, proceed, successorState));
+            stage.addEdge(new Stage.Edge<>(EdgeOperation.PROCEED, proceed, successorStage));
         }
 
         // we need to introduce a required state
         if(hasMandatoryState) {
-            successorState = state;
-            state = new State<>(currentPattern.getName(), type);
-            state.addEdge(new State.Edge<>(EdgeOperation.BEGIN,  currentPattern.getPredicate(), successorState));
+            successorStage = stage;
+            stage = new Stage<>(currentPattern.getName(), type);
+            stage.addEdge(new Stage.Edge<>(EdgeOperation.BEGIN,  currentPattern.getPredicate(), successorStage));
 
-            state.setWindow(windowLengthMs); // Pushing the time window early
+            stage.setWindow(windowLengthMs); // Pushing the time window early
         }
 
-        return state;
+        return stage;
     }
 
     private long getWindowLengthMs(Pattern<K, V> currentPattern, Pattern<K, V> successorPattern) {

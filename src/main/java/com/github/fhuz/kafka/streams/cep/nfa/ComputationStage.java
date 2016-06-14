@@ -17,9 +17,9 @@
 package com.github.fhuz.kafka.streams.cep.nfa;
 
 import com.github.fhuz.kafka.streams.cep.Event;
-import com.github.fhuz.kafka.streams.cep.State;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
@@ -27,9 +27,9 @@ import java.util.List;
  * @param <K> the type of the key event.
  * @param <V> the type of the value event.
  */
-public class ComputationState<K, V> {
+public class ComputationStage<K, V> {
 
-    private final State<K , V> state;
+    private final Stage<K , V> stage;
 
     /**
      * The pointer to the most recent event into the share buffer.
@@ -46,48 +46,61 @@ public class ComputationState<K, V> {
      */
     private DeweyVersion version;
 
-    public ComputationState(State<K, V> state, DeweyVersion version) {
-        this(state, version, null, -1);
+    /**
+     * Flag to indicate this computation stage is the first of a new branch.
+     */
+    private boolean isBranching = false;
+
+    public ComputationStage(Stage<K, V> stage, DeweyVersion version) {
+        this(stage, version, null, -1);
     }
 
-    public ComputationState(State<K, V> state, DeweyVersion version, Event<K, V> event, long timestamp) {
-        this.state = state;
+    public ComputationStage(Stage<K, V> stage, DeweyVersion version, Event<K, V> event, long timestamp) {
+        this.stage = stage;
         this.event = event;
         this.timestamp = timestamp;
         this.version = version;
     }
 
+    public void setBranching(boolean branching) {
+        this.isBranching = branching;
+    }
+
+    public boolean isBranching() {
+        return isBranching;
+    }
+
     public boolean isOutOfWindow(long time) {
-        return state.getWindowMs() != -1 && (time - timestamp) > state.getWindowMs();
+        return stage.getWindowMs() != -1 && (time - timestamp) > stage.getWindowMs();
     }
 
     /**
-     * @see {@link State#isBeginState()}.
+     * @see {@link Stage#isBeginState()}.
      */
     public boolean isBeginState() {
-        return state.isBeginState();
+        return stage.isBeginState();
     }
 
     /**
-     * Checks whether this {@link ComputationState} is forwarding to the next state.
+     * Checks whether this {@link ComputationStage} is forwarding to the next state.
      * @return <code>true</code> if this computation contains a single "proceed" operation.
      */
     public boolean isForwarding( ) {
-        List<State.Edge<K, V>> edges = state.getEdges();
+        List<Stage.Edge<K, V>> edges = stage.getEdges();
         return ( edges.size() == 1 && edges.get(0).is(EdgeOperation.PROCEED));
     }
 
     /**
-     * Checks whether this {@link ComputationState} is forwarding to the final state.
+     * Checks whether this {@link ComputationStage} is forwarding to the final state.
      */
     public boolean isForwardingToFinalState( ) {
-        List<State.Edge<K, V>> edges = state.getEdges();
+        List<Stage.Edge<K, V>> edges = stage.getEdges();
         return ( isForwarding()
                 && edges.get(0).getTarget().isFinalState());
     }
 
-    public State<K, V> getState() {
-        return state;
+    public Stage<K, V> getStage() {
+        return stage;
     }
 
     public Event<K, V> getEvent() {
@@ -102,14 +115,14 @@ public class ComputationState<K, V> {
         return version;
     }
 
-    public ComputationState<K, V> setEvent(Event<K, V> event) {
-        return new ComputationState<>(state, version, event, timestamp);
+    public ComputationStage<K, V> setEvent(Event<K, V> event) {
+        return new ComputationStage<>(stage, version, event, timestamp);
     }
 
     @Override
     public String toString() {
-        final StringBuilder sb = new StringBuilder("ComputationState{");
-        sb.append("state=").append(state);
+        final StringBuilder sb = new StringBuilder("ComputationStage{");
+        sb.append("stage=").append(stage);
         sb.append(", event=").append(event);
         sb.append(", timestamp=").append(timestamp);
         sb.append(", version=").append(version);

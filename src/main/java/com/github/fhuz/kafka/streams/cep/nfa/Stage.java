@@ -14,10 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.fhuz.kafka.streams.cep;
+package com.github.fhuz.kafka.streams.cep.nfa;
 
-import com.github.fhuz.kafka.streams.cep.nfa.EdgeOperation;
 import com.github.fhuz.kafka.streams.cep.pattern.Matcher;
+import org.apache.kafka.streams.processor.StateStore;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -27,40 +27,49 @@ import java.util.Objects;
 /**
  * Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
  */
-public class State<K, V> implements Serializable, Comparable<State<K, V>> {
+public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
 
     private String name;
     private StateType type;
     private long windowMs = -1;
+    private String state;
 
     /**
      * Dummy constructor required by Kryo.
      */
-    public State() {}
+    public Stage() {}
 
     private List<Edge<K, V>> edges;
 
     /**
-     * Creates a new {@link State} instance.
+     * Creates a new {@link Stage} instance.
      * @param name
      * @param type
      */
-    public State(String name, StateType type) {
+    public Stage(String name, StateType type) {
         this.name = name;
         this.type = type;
         this.edges = new ArrayList<>();
+    }
+
+    public void setState(String state) {
+        this.state = state;
+    }
+
+    public String getState() {
+        return this.state;
     }
 
     public long getWindowMs() {
         return this.windowMs;
     }
 
-    public State<K, V> setWindow(long windowMs) {
+    public Stage<K, V> setWindow(long windowMs) {
         this.windowMs = windowMs;
         return this;
     }
 
-    public State<K, V> addEdge(Edge<K, V> edge) {
+    public Stage<K, V> addEdge(Edge<K, V> edge) {
         this.edges.add(edge);
         return this;
     }
@@ -89,9 +98,9 @@ public class State<K, V> implements Serializable, Comparable<State<K, V>> {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        State<?, ?> state = (State<?, ?>) o;
-        return Objects.equals(name, state.name) &&
-                type == state.type;
+        Stage<?, ?> stage = (Stage<?, ?>) o;
+        return Objects.equals(name, stage.name) &&
+                type == stage.type;
     }
 
     @Override
@@ -100,14 +109,14 @@ public class State<K, V> implements Serializable, Comparable<State<K, V>> {
     }
 
     @Override
-    public int compareTo(State<K, V> that) {
+    public int compareTo(Stage<K, V> that) {
         return this.name.compareTo(that.name);
     }
 
     public static class Edge<K, V> implements Serializable {
         private EdgeOperation operation;
         private Matcher<K, V> predicate;
-        private State<K, V> target;
+        private Stage<K, V> target;
 
         /**
          * Creates a new {@łink Edge} instance.
@@ -116,7 +125,7 @@ public class State<K, V> implements Serializable, Comparable<State<K, V>> {
          * @param predicate the predicate to apply.
          * @param target the state to move forward if predicate is true.
          */
-        public Edge(EdgeOperation operation, Matcher<K, V> predicate, State<K, V> target) {
+        public Edge(EdgeOperation operation, Matcher<K, V> predicate, Stage<K, V> target) {
             if( predicate == null ) throw new IllegalArgumentException("predicate cannot be null");
             if( operation == null ) throw new IllegalArgumentException("operation cannot be null");
             this.operation = operation;
@@ -128,11 +137,11 @@ public class State<K, V> implements Serializable, Comparable<State<K, V>> {
             return operation;
         }
 
-        public boolean matches(K key, V value, long timestamp) {
-            return predicate.matches(key, value, timestamp, null);
+        public boolean matches(K key, V value, long timestamp, StateStore stateStore) {
+            return predicate.matches(key, value, timestamp, stateStore);
         }
 
-        public State<K, V> getTarget() {
+        public Stage<K, V> getTarget() {
             return target;
         }
 
@@ -153,7 +162,7 @@ public class State<K, V> implements Serializable, Comparable<State<K, V>> {
 
     @Override
     public String toString() {
-        final StringBuilder sb = new StringBuilder("State{");
+        final StringBuilder sb = new StringBuilder("Stage{");
         sb.append("name='").append(name).append('\'');
         sb.append(", type=").append(type);
         sb.append(", edges=").append(edges);
