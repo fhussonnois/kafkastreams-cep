@@ -3,19 +3,24 @@ Complex Event Processing on top of KafkaStreams Processor API
 
 ###This repository is not stable - development is in progress.
 
+## TODO / KNOWN ISSUES
+ * NFA class is not tolerant to kafka rebalance operations.
+ * A Stage state should be maintained per nfa run
+ * NFA is not currently tolerant to at-least once semantic (keep a high water mark)
+ 
 ## How to build a CEP processor
-```[java]
+```java
         Pattern<String, String> query = new SequenceQuery<String, String>()
                 .select("first")
-                .where((key, value, timestamp, store) -> value.equals("A"))
+                    .where((key, value, timestamp, store) -> value.equals("A"))
                 .followBy("second")
-                .where((key, value, timestamp, store) -> value.equals("B"))
+                    .where((key, value, timestamp, store) -> value.equals("B"))
                 .followBy("three")
-                .where((key, value, timestamp, store) -> value.equals("C"))
-                .withStrategy(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH)
+                    .where((key, value, timestamp, store) -> value.equals("C"))
+                    .withStrategy(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH)
                 .followBy("latest")
-                .where((key, value, timestamp, store) -> value.equals("D"))
-                .withStrategy(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH);
+                    .where((key, value, timestamp, store) -> value.equals("D"))
+                    .withStrategy(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH);
 
         
         TopologyBuilder topologyBuilder = new TopologyBuilder();
@@ -32,7 +37,7 @@ Complex Event Processing on top of KafkaStreams Processor API
  * Strict contiguity
  * Skip till next match
  * Skip till any match
-
+ 
 ###Licence
 Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements. See the NOTICE file distributed with this work for additional information regarding copyright ownership. The ASF licenses this file to you under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
 
