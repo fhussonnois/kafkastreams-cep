@@ -17,16 +17,24 @@
 package com.github.fhuz.kafka.streams.cep.pattern;
 
 
-public class SequenceQuery<K, V> {
+public class QueryBuilder<K, V> {
 
     /**
-     * Creates a new {@link SequenceQuery} instance.
+     * Creates a new stage with the specified name.
+     *
+     * @param name the stage name.
+     * @return a new {@link SelectBuilder}.
      */
-    public SequenceQuery() {
-
+    public SelectBuilder<K, V> select(String name) {
+        return  new SelectBuilder<>(new Pattern<>(name));
     }
 
-    public Pattern<K, V> select(String name) {
-        return new Pattern<>(name);
+    /**
+     * Creates a new stage with no name.
+     *
+     * @return a new {@link SelectBuilder}.
+     */
+    public SelectBuilder<K, V> select() {
+        return new SelectBuilder<>(new Pattern<>());
     }
 }

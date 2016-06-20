@@ -16,12 +16,10 @@
  */
 package com.github.fhuz.kafka.streams.cep.pattern;
 
-import org.apache.kafka.streams.processor.StateStore;
-
 @FunctionalInterface
 public interface Matcher<K, V> {
 
-    boolean matches(K key, V value, long timestamp, StateStore store);
+    boolean matches(K key, V value, long timestamp, States store);
 
     static <K, V> Matcher<K, V> not(Matcher<K, V> predicate) {
         return (key, value, timestamp, stateStore) -> !predicate.matches(key, value, timestamp, stateStore);
@@ -48,7 +46,7 @@ public interface Matcher<K, V> {
          * {@inheritDoc}
          */
         @Override
-        public boolean matches(K key, V value, long timestamp, StateStore store) {
+        public boolean matches(K key, V value, long timestamp, States store) {
             return left.matches(key, value, timestamp, store) && right.matches(key, value, timestamp, store);
         }
     }
@@ -66,7 +64,7 @@ public interface Matcher<K, V> {
          * {@inheritDoc}
          */
         @Override
-        public boolean matches(K key, V value, long timestamp, StateStore store) {
+        public boolean matches(K key, V value, long timestamp, States store) {
             return left.matches(key, value, timestamp, store) || right.matches(key, value, timestamp, store);
         }
     }

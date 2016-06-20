@@ -19,8 +19,12 @@ package com.github.fhuz.kafka.streams.cep.nfa;
 import com.github.fhuz.kafka.streams.cep.Event;
 import com.github.fhuz.kafka.streams.cep.Sequence;
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.KVSharedVersionedBuffer;
+import com.github.fhuz.kafka.streams.cep.pattern.States;
+import com.github.fhuz.kafka.streams.cep.pattern.ValueStore;
+import com.github.fhuz.kafka.streams.cep.pattern.StateAggregator;
+import org.apache.kafka.common.utils.SystemTime;
 import org.apache.kafka.streams.processor.ProcessorContext;
-import org.apache.kafka.streams.processor.StateStore;
+import org.apache.kafka.streams.state.KeyValueStore;
 import org.slf4j.Logger;
 
 import java.io.Serializable;
@@ -30,6 +34,7 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 
@@ -146,58 +151,101 @@ public class NFA<K, V> implements Serializable {
 
     private Collection<ComputationStage<K, V>> evaluate(ComputationContext<K, V> ctx, Stage<K, V> currentStage, Stage<K, V> previousStage) {
         ComputationStage<K, V> computationStage = ctx.computationStage;
+        final UUID sequenceID = computationStage.getSequenceID();
         final Event<K, V> previousEvent = computationStage.getEvent();
         final DeweyVersion version      = computationStage.getVersion();
 
-        List<Stage.Edge<K, V>> matchedEdges = matchEdgesAndGet(ctx.key, ctx.value, ctx.timestamp, currentStage);
+        List<Stage.Edge<K, V>> matchedEdges = matchEdgesAndGet(ctx.key, ctx.value, ctx.timestamp, sequenceID, currentStage);
 
         Collection<ComputationStage<K, V>> nextComputationStages = new ArrayList<>();
         final boolean isBranching = isBranching(matchedEdges);
         Event<K, V> currentEvent = ctx.getEvent();
+
+        long startTime = ctx.getFirstPatternTimestamp();
+        boolean consumed = false;
+        boolean ignored  = false;
         for(Stage.Edge<K, V> e : matchedEdges) {
             Stage<K, V> epsilonStage = newEpsilonState(currentStage, e.getTarget());
             switch (e.getOperation()) {
                 case PROCEED:
-                    nextComputationStages.addAll(evaluate(ctx, e.getTarget(), currentStage));
+                    ComputationContext<K, V> nextContext = ctx;
+                    // Checks whether epsilon operation is forwarding to a new stage and doesn't result from new branch.
+                    if ( ! e.getTarget().equals(currentStage) && !ctx.computationStage.isBranching() ) {
+                        ComputationStage<K, V> newStage = ctx.computationStage.setVersion(ctx.computationStage.getVersion().addStage());
+                        nextContext = new ComputationContext<>(this.context, ctx.key, ctx.value, ctx.timestamp, newStage);
+                    }
+                    nextComputationStages.addAll(evaluate(nextContext, e.getTarget(), currentStage));
                     break;
                 case TAKE :
+                    // The event has matched the current event and not the next one.
                     if( ! isBranching ) {
-                        nextComputationStages.add(computationStage.setEvent(currentEvent));
-                        sharedVersionedBuffer.put(currentStage, currentEvent, previousStage, previousEvent, version);
+                        // Re-add the current stage to NFA
+                        nextComputationStages.add(new ComputationStage<>(newEpsilonState(currentStage, currentStage), version, currentEvent, startTime, sequenceID));
+                        // Add the current event to buffer using current version path.
+                        putToSharedBuffer(currentStage, previousStage, previousEvent, currentEvent, version);
                     } else {
-                        sharedVersionedBuffer.put(currentStage, currentEvent, version.addRun());
+                        putToSharedBuffer(currentStage, previousStage, previousEvent, currentEvent, version.addRun());
                     }
-                    if( computationStage.isBranching() ) sharedVersionedBuffer.branch(previousStage, previousEvent, version);
+                    // Else the event is handle by PROCEED edge.
+                    consumed = true;
                     break;
                 case BEGIN :
-                    if( previousStage != null)
-                        sharedVersionedBuffer.put(currentStage, currentEvent, previousStage, previousEvent, version);
-                    else
-                        sharedVersionedBuffer.put(currentStage, currentEvent, version);
-                    nextComputationStages.add(new ComputationStage<>(epsilonStage, version.addStage(), currentEvent, ctx.getFirstPatternTimestamp()));
-                    if( computationStage.isBranching() ) sharedVersionedBuffer.branch(previousStage, previousEvent, version);
+                    // Add the current event to buffer using current version path
+                    putToSharedBuffer(currentStage, previousStage, previousEvent, currentEvent, version);
+                    // Compute the next stage in NFA
+                    nextComputationStages.add(new ComputationStage<>(epsilonStage, version, currentEvent, startTime, sequenceID));
+                    consumed = true;
                     break;
                 case IGNORE:
-                    if(!isBranching)
-                        nextComputationStages.add(computationStage);
+                    // Re-add the current stage to NFA
+                    if(!isBranching) nextComputationStages.add(computationStage);
+                    ignored = true;
                     break;
             }
         }
+
         if(isBranching) {
-            Stage<K, V> epsilonStage = newEpsilonState(previousStage, currentStage);
-            ComputationStage<K, V> newStage = new ComputationStage<>(epsilonStage, version.addRun(), computationStage.getEvent(), ctx.getFirstPatternTimestamp());
+            UUID newSequenceId = UUID.randomUUID();
+            Event<K, V> latestMatchEvent = ignored ? previousEvent : currentEvent;
+            ComputationStage<K, V> newStage = new ComputationStage<>(newEpsilonState(previousStage, currentStage), version.addRun(), latestMatchEvent, startTime, newSequenceId);
             newStage.setBranching(true);
             nextComputationStages.add(newStage);
+            currentStage.getAggregates().forEach(agg -> newStageStateStore(agg.getName(), sequenceID).branch(newSequenceId));
+
+            if(consumed)
+                sharedVersionedBuffer.branch(previousStage, previousEvent, version);
         }
+
+        if( consumed ) evaluateAggregates(currentStage.getAggregates(), sequenceID, ctx.key, ctx.value);
         return nextComputationStages;
     }
 
-    private List<Stage.Edge<K, V>> matchEdgesAndGet(K key, V value, long timestamp, Stage<K, V> currentStage) {
-        final StateStore stateStore = currentStage.getState() != null ? context.getStateStore(currentStage.getState()) : null;
+    private void putToSharedBuffer(Stage<K, V> currentStage, Stage<K, V> previousStage, Event<K, V> previousEvent, Event<K, V> currentEvent, DeweyVersion nextVersion) {
+        if( previousStage != null)
+            sharedVersionedBuffer.put(currentStage, currentEvent, previousStage, previousEvent, nextVersion);
+        else
+            sharedVersionedBuffer.put(currentStage, currentEvent, nextVersion);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void evaluateAggregates(List<StateAggregator<K, V, Object>> aggregates, UUID sequenceID, K key, V value) {
+        aggregates.forEach(agg -> {
+            ValueStore store = newStageStateStore(agg.getName(), sequenceID);
+            store.set(agg.getAggregate().aggregate(key, value, store.get()));
+        });
+    }
+
+    private List<Stage.Edge<K, V>> matchEdgesAndGet(K key, V value, long timestamp, UUID seqId, Stage<K, V> currentStage) {
+        States store = new States(context, seqId);
         return currentStage.getEdges()
                 .stream()
-                .filter(e -> e.matches(key, value, timestamp, stateStore))
+                .filter(e -> e.matches(key, value, timestamp, store))
                 .collect(Collectors.toList());
+    }
+
+    @SuppressWarnings("unchecked")
+    private ValueStore newStageStateStore(String state, UUID seqId) {
+        return new ValueStore(context.topic(), context.partition(), seqId, (KeyValueStore)context.getStateStore(state));
     }
 
     private Stage<K, V> newEpsilonState(Stage<K, V> current, Stage<K, V> target) {

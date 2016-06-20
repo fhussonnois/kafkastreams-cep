@@ -92,7 +92,7 @@ public class KVSharedVersionedBuffer<K , V> implements SharedVersionedBuffer<K, 
 
         TimedKeyValue sharedPrevEvent = this.store.get(prevEventKey);
         if( sharedPrevEvent == null) {
-            throw new IllegalStateException("Cannot find predecessor event for ");
+            throw new IllegalStateException("Cannot find predecessor event for " + prevEventKey);
         }
 
         TimedKeyValue sharedCurrEvent = this.store.get(currEventKey);
@@ -263,6 +263,18 @@ public class KVSharedVersionedBuffer<K , V> implements SharedVersionedBuffer<K, 
         public int compareTo(TimedKeyValue<K, V> that) {
             return new Long(this.timestamp).compareTo(that.getTimestamp());
         }
+
+        @Override
+        public String toString() {
+            final StringBuilder sb = new StringBuilder("TimedKeyValue{");
+            sb.append("timestamp=").append(timestamp);
+            sb.append(", key=").append(key);
+            sb.append(", value=").append(value);
+            sb.append(", refs=").append(refs);
+            sb.append(", predecessors=").append(predecessors);
+            sb.append('}');
+            return sb.toString();
+        }
     }
 
     public static class Pointer<K, V> implements Serializable {
@@ -353,6 +365,17 @@ public class KVSharedVersionedBuffer<K , V> implements SharedVersionedBuffer<K, 
             else if (this.offset < that.offset) return -1;
             else return 0;
         }
+
+        @Override
+        public String toString() {
+            final StringBuilder sb = new StringBuilder("StackEventKey{");
+            sb.append("state=").append(state);
+            sb.append(", topic='").append(topic).append('\'');
+            sb.append(", partition=").append(partition);
+            sb.append(", offset=").append(offset);
+            sb.append('}');
+            return sb.toString();
+        }
     }
 
 
@@ -385,6 +408,15 @@ public class KVSharedVersionedBuffer<K , V> implements SharedVersionedBuffer<K, 
         @Override
         public int compareTo(StateKey o) {
             return this.name.compareTo(o.name);
+        }
+
+        @Override
+        public String toString() {
+            final StringBuilder sb = new StringBuilder("StateKey{");
+            sb.append("name='").append(name).append('\'');
+            sb.append(", type=").append(type);
+            sb.append('}');
+            return sb.toString();
         }
     }
 }

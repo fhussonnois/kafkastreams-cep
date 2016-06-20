@@ -19,7 +19,7 @@ package com.github.fhuz.kafka.streams.cep.nfa;
 import com.github.fhuz.kafka.streams.cep.Event;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.UUID;
 
 /**
  * Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
@@ -46,20 +46,31 @@ public class ComputationStage<K, V> {
      */
     private DeweyVersion version;
 
+    private UUID sequenceID;
+
     /**
      * Flag to indicate this computation stage is the first of a new branch.
      */
     private boolean isBranching = false;
 
     public ComputationStage(Stage<K, V> stage, DeweyVersion version) {
-        this(stage, version, null, -1);
+        this(stage, version, null, -1, UUID.randomUUID());
     }
 
-    public ComputationStage(Stage<K, V> stage, DeweyVersion version, Event<K, V> event, long timestamp) {
+    public ComputationStage(Stage<K, V> stage, DeweyVersion version, Event<K, V> event, long timestamp, UUID sequenceID) {
         this.stage = stage;
         this.event = event;
         this.timestamp = timestamp;
         this.version = version;
+        this.sequenceID = sequenceID;
+    }
+
+    public ComputationStage<K, V> setVersion(DeweyVersion version) {
+        return new ComputationStage<>(stage, version, event, timestamp, sequenceID);
+    }
+
+    public UUID getSequenceID() {
+        return sequenceID;
     }
 
     public void setBranching(boolean branching) {
@@ -116,7 +127,7 @@ public class ComputationStage<K, V> {
     }
 
     public ComputationStage<K, V> setEvent(Event<K, V> event) {
-        return new ComputationStage<>(stage, version, event, timestamp);
+        return new ComputationStage<>(stage, version, event, timestamp, sequenceID);
     }
 
     @Override

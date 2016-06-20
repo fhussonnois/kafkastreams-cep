@@ -74,8 +74,7 @@ public class NFAFactory<K, V> {
         Stage<K, V> stage = new Stage<>(currentPattern.getName(),currentType);
         long windowLengthMs = getWindowLengthMs(currentPattern, successorPattern);
         stage.setWindow(windowLengthMs); // Pushing the time window early
-
-        stage.setState(currentPattern.getState());
+        stage.setAggregates(currentPattern.getAggregates());
 
         final Matcher<K, V> predicate = currentPattern.getPredicate();
         EdgeOperation operation = cardinality.equals(Pattern.Cardinality.ONE) ? EdgeOperation.BEGIN : EdgeOperation.TAKE;
@@ -112,8 +111,8 @@ public class NFAFactory<K, V> {
             successorStage = stage;
             stage = new Stage<>(currentPattern.getName(), type);
             stage.addEdge(new Stage.Edge<>(EdgeOperation.BEGIN,  currentPattern.getPredicate(), successorStage));
-
             stage.setWindow(windowLengthMs); // Pushing the time window early
+            stage.setAggregates(currentPattern.getAggregates());
         }
 
         return stage;

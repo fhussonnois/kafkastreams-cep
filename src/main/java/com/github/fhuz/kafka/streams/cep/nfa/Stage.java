@@ -16,8 +16,9 @@
  */
 package com.github.fhuz.kafka.streams.cep.nfa;
 
+import com.github.fhuz.kafka.streams.cep.pattern.States;
 import com.github.fhuz.kafka.streams.cep.pattern.Matcher;
-import org.apache.kafka.streams.processor.StateStore;
+import com.github.fhuz.kafka.streams.cep.pattern.StateAggregator;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -32,7 +33,7 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
     private String name;
     private StateType type;
     private long windowMs = -1;
-    private String state;
+    private List<StateAggregator<K, V, Object>> aggregates;
 
     /**
      * Dummy constructor required by Kryo.
@@ -52,12 +53,12 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
         this.edges = new ArrayList<>();
     }
 
-    public void setState(String state) {
-        this.state = state;
+    public void setAggregates(List<StateAggregator<K, V, Object>> aggregator) {
+        this.aggregates = aggregator;
     }
 
-    public String getState() {
-        return this.state;
+    public List<StateAggregator<K, V, Object>> getAggregates() {
+        return this.aggregates;
     }
 
     public long getWindowMs() {
@@ -99,8 +100,7 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Stage<?, ?> stage = (Stage<?, ?>) o;
-        return Objects.equals(name, stage.name) &&
-                type == stage.type;
+        return Objects.equals(name, stage.name) && type == stage.type;
     }
 
     @Override
@@ -137,8 +137,8 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
             return operation;
         }
 
-        public boolean matches(K key, V value, long timestamp, StateStore stateStore) {
-            return predicate.matches(key, value, timestamp, stateStore);
+        public boolean matches(K key, V value, long timestamp, States store) {
+            return predicate.matches(key, value, timestamp, store);
         }
 
         public Stage<K, V> getTarget() {

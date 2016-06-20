@@ -16,7 +16,9 @@
  */
 package com.github.fhuz.kafka.streams.cep.pattern;
 
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
 
@@ -54,6 +56,8 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
         SKIP_TIL_ANY_MATCH
     }
 
+    private int level;
+
     private String name;
 
     private Matcher<K, V> predicate;
@@ -66,85 +70,95 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
 
     private SelectStrategy strategy;
 
-    private String state;
+    private List<StateAggregator<K, V, Object>> aggregates;
 
     private Cardinality cardinality = Cardinality.ONE;
 
     /**
      * Creates a new {@link Pattern} instance.
      **/
+    Pattern() {
+        this(0, null);
+    }
+    /**
+     * Creates a new {@link Pattern} instance.
+     **/
     Pattern(String name) {
-        this(name, SelectStrategy.STRICT_CONTIGUITY, null);
+        this(0, name);
+    }
+
+    /**
+     * Creates a new {@link Pattern} instance.
+     **/
+    Pattern(int level, String name) {
+        this(level, name, null);
+    }
+
+    /**
+     * Creates a new {@link Pattern} instance.
+     *
+     * @param ancestor the ancestor event pattern.
+     */
+    Pattern(Pattern<K, V> ancestor) {
+        this(ancestor.level + 1, null, ancestor);
     }
 
     /**
      * Creates a new {@link Pattern} instance.
      *
      * @param name     the name of the event.
-     * @param strategy the strategy used to select event.
      * @param ancestor the ancestor event pattern.
      */
-    private Pattern(String name, SelectStrategy strategy, Pattern<K, V> ancestor) {
+    private Pattern(int level, String name, Pattern<K, V> ancestor) {
+        this.level     = level;
+        this.name      = name;
+        this.ancestor  = ancestor;
+        this.strategy  = SelectStrategy.STRICT_CONTIGUITY;
+        this.aggregates = new ArrayList<>();
+    }
+
+
+    public SelectBuilder<K, V> select() {
+        return new SelectBuilder<>(this);
+    }
+
+    public SelectBuilder<K, V> select(String name) {
         this.name = name;
-        this.ancestor = ancestor;
-        this.strategy = strategy;
+        return new SelectBuilder<>(this);
     }
 
-    public Pattern<K, V> withStrategy(SelectStrategy strategy) {
-        this.strategy = strategy;
+    @SuppressWarnings("unchecked")
+    <T> Pattern<K, V> addStateAggregator(StateAggregator<K, V, T> aggregator) {
+        this.aggregates.add((StateAggregator<K, V, Object>)aggregator);
         return this;
     }
 
-    public Pattern<K, V> withState(String state) {
-        this.state = state;
-        return this;
+    void setStrategy(SelectStrategy strategy) {
+        this.strategy = strategy;
     }
 
-    public Pattern<K, V> where(Matcher<K, V> predicate) {
+    void setWindow(long time, TimeUnit unit) {
+        this.windowTime = time;
+        this.windowUnit = unit;
+    }
+
+    void addPredicate(Matcher<K, V> predicate) {
         if (this.predicate == null)
             this.predicate = predicate;
         else
             this.predicate = Matcher.and(this.predicate, predicate);
-        return this;
     }
 
-    public Pattern<K, V> within(long time, TimeUnit unit) {
-        this.windowTime = time;
-        this.windowUnit = unit;
-        return this;
+    void setCardinality(Cardinality cardinality) {
+        this.cardinality = cardinality;
     }
-
-    public Pattern<K, V> followBy(String event) {
-        return followBy(event, SelectStrategy.STRICT_CONTIGUITY);
-    }
-
-    public Pattern<K, V> followBy(String event, SelectStrategy strategy) {
-        return new Pattern<>(event, strategy, this);
-    }
-
-    public Pattern<K, V> optional() {
-        this.cardinality = Cardinality.OPTIONAL;
-        return this;
-    }
-
-    public Pattern<K, V> oneOrMore() {
-        this.cardinality = Cardinality.ONE_OR_MORE;
-        return this;
-    }
-
-    public Pattern<K, V> zeroOrMore() {
-        this.cardinality = Cardinality.ZERO_OR_MORE;
-        return this;
-    }
-
-    String getState() { return this.state; }
 
     Cardinality getCardinality() {
         return cardinality;
     }
 
     String getName() {
-        return name;
+        return (name == null) ? String.valueOf(this.level) : name;
     }
 
     Matcher<K, V> getPredicate() {
@@ -166,6 +180,8 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
     SelectStrategy getStrategy() {
         return strategy;
     }
+
+    List<StateAggregator<K, V, Object>> getAggregates() { return this.aggregates; }
 
     @Override
     public Iterator<Pattern<K, V>> iterator() {

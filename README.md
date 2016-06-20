@@ -1,33 +1,59 @@
 Complex Event Processing on top of KafkaStreams Processor API
-====================================
+=============================================================
 
-###This repository is not stable - development is in progress.
+###This repository is not stable - library is still in progress (use at your own risk)
 
 ## TODO / KNOWN ISSUES
  * NFA class is not tolerant to kafka rebalance operations.
  * A Stage state should be maintained per nfa run
  * NFA is not currently tolerant to at-least once semantic (keep a high water mark)
- 
-## How to build a CEP processor
+
+## Demonstration
+
+The below example is based on the research paper **Efficient Pattern Matching over Event Streams**.
+
+### CEP Query : 
+
+```
+     PATTERN SEQ(Stock+ a[ ], Stock b)
+       WHERE skip_till_next_match(a[ ], b) {
+           [symbol]
+       and
+           a[1].volume > 1000
+       and
+           a[i].price > avg(a[..i-1].price)
+       and
+           b.volume < 80%*a[a.LEN].volume }
+       WITHIN 1 hour
+```
+### KafkaStreams implementation:
+
 ```java
-        Pattern<String, String> query = new SequenceQuery<String, String>()
-                .select("first")
-                    .where((key, value, timestamp, store) -> value.equals("A"))
-                .followBy("second")
-                    .where((key, value, timestamp, store) -> value.equals("B"))
-                .followBy("three")
-                    .where((key, value, timestamp, store) -> value.equals("C"))
-                    .withStrategy(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH)
-                .followBy("latest")
-                    .where((key, value, timestamp, store) -> value.equals("D"))
-                    .withStrategy(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH);
+        Pattern<Object, StockEvent> pattern = new SequenceQuery<Object, StockEvent>()
+                .select()
+                    .where((k, v, ts, store) -> v.volume > 1000)
+                    .<Integer>fold("avg", (k, v, curr) -> v.price)
+                    .then()
+                .select()
+                    .oneOrMore()
+                    .skipTillNextMatch()
+                    .where((k, v, ts, state) -> v.price > (int)state.get("avg"))
+                    .<Integer>fold("avg", (k, v, curr) -> (curr + v.price) / 2)
+                    .<Integer>fold("volume", (k, v, curr) -> v.volume)
+                    .then()
+                .select()
+                    .skipTillNextMatch()
+                    .where((k, v, ts, state) -> v.volume < (0.8 *  (int)state.get("volume")))
+                    .within(1, TimeUnit.HOURS)
+                .build();
 
-        
         TopologyBuilder topologyBuilder = new TopologyBuilder();
-        topologyBuilder.addSource("MyEventSource", "MyTopic")
-                .addProcessor("cep-proc", () -> new CEPProcessor<>(query), "MyEventSource");
+        topologyBuilder.addSource("source", "StockEvents")
+                .addProcessor("cep", () -> new CEPProcessor<>(query), "source");
 
-        topologyBuilder.addStateStore(CEPProcessor.getEventsStore(true), "cep-proc"); // required
+        topologyBuilder.addStateStore(CEPProcessor.getEventsStore(true), "cep");    // required for buffer event matches
+        topologyBuilder.addStateStore(CEPProcessor.getEventsStore(true), "volume"); // required for cep aggregates (i.e fold method)
+        topologyBuilder.addStateStore(CEPProcessor.getEventsStore(true), "avg");    // required for cep aggregates (i.e fold method)
 
         //Use the topologyBuilder and streamingConfig to start the kafka streams process
         KafkaStreams streaming = new KafkaStreams(topologyBuilder, streamingConfig);

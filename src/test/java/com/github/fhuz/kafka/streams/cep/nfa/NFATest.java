@@ -3,7 +3,7 @@ package com.github.fhuz.kafka.streams.cep.nfa;
 import com.github.fhuz.kafka.streams.cep.Event;
 import com.github.fhuz.kafka.streams.cep.Sequence;
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.KVSharedVersionedBuffer;
-import com.github.fhuz.kafka.streams.cep.pattern.SequenceQuery;
+import com.github.fhuz.kafka.streams.cep.pattern.QueryBuilder;
 import com.github.fhuz.kafka.streams.cep.pattern.NFAFactory;
 import com.github.fhuz.kafka.streams.cep.pattern.Pattern;
 import org.apache.kafka.common.serialization.Serde;
@@ -18,8 +18,13 @@ import org.junit.Test;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.*;
 
@@ -34,13 +39,16 @@ public class NFATest {
     @Test
     public void testNFAWithOneRunAndStrictContiguity() {
 
-        Pattern<String, String> query = new SequenceQuery<String, String>()
+        Pattern<String, String> query = new QueryBuilder<String, String>()
                 .select("first")
-                .where((key, value, timestamp, store) -> value.equals("A"))
-                .followBy("second")
-                .where((key, value, timestamp, store) -> value.equals("B"))
-                .followBy("latest")
-                .where((key, value, timestamp, store) -> value.equals("C"));
+                    .where((key, value, timestamp, store) -> value.equals("A"))
+                .then()
+                .select("second")
+                    .where((key, value, timestamp, store) -> value.equals("B"))
+                .then()
+                .select("latest")
+                    .where((key, value, timestamp, store) -> value.equals("C"))
+                .build();
 
         List<Stage<String, String>> stages = new NFAFactory<String, String>().make(query);
         DummyProcessorContext context = new DummyProcessorContext();
@@ -58,16 +66,20 @@ public class NFATest {
 
     @Test
     public void testNFAWithOneRunAndMultipleMatch() {
-        Pattern<String, String> query = new SequenceQuery<String, String>()
+        Pattern<String, String> query = new QueryBuilder<String, String>()
                 .select("firstStage")
                     .where((key, value, timestamp, store) -> value.equals("A"))
-                .followBy("secondStage")
+                    .then()
+                .select("secondStage")
                     .where((key, value, timestamp, store) -> value.equals("B"))
-                .followBy("thirdStage")
-                    .where((key, value, timestamp, store) -> value.equals("C"))
+                    .then()
+                .select("thirdStage")
                     .oneOrMore()
-                .followBy("latestState")
-                    .where((key, value, timestamp, store) -> value.equals("D"));
+                    .where((key, value, timestamp, store) -> value.equals("C"))
+                    .then()
+                .select("latestState")
+                    .where((key, value, timestamp, store) -> value.equals("D"))
+                    .build();
 
         List<Stage<String, String>> stages = new NFAFactory<String, String>().make(query);
         DummyProcessorContext context = new DummyProcessorContext();
@@ -90,15 +102,18 @@ public class NFATest {
     @Test
     public void testNFAWithSkipTillNextMatch() {
 
-        Pattern<String, String> pattern = new SequenceQuery<String, String>()
+        Pattern<String, String> pattern = new QueryBuilder<String, String>()
                 .select("first")
-                .where((key, value, timestamp, store) -> value.equals("A"))
-                .followBy("second")
-                .where((key, value, timestamp, store) -> value.equals("C"))
-                .withStrategy(Pattern.SelectStrategy.SKIP_TIL_NEXT_MATCH)
-                .followBy("latest")
-                .where((key, value, timestamp, store) -> value.equals("D"))
-                .withStrategy(Pattern.SelectStrategy.SKIP_TIL_NEXT_MATCH);
+                    .where((key, value, timestamp, store) -> value.equals("A"))
+                .then()
+                .select("second")
+                    .skipTillNextMatch()
+                    .where((key, value, timestamp, store) -> value.equals("C"))
+                .then()
+                .select("latest")
+                    .skipTillNextMatch()
+                    .where((key, value, timestamp, store) -> value.equals("D"))
+                .build();
 
         List<Stage<String, String>> stages = new NFAFactory<String, String>().make(pattern);
         DummyProcessorContext context = new DummyProcessorContext();
@@ -117,17 +132,21 @@ public class NFATest {
     @Test
     public void testNFAWithSkipTillAnyMatch() {
 
-        Pattern<String, String> pattern = new SequenceQuery<String, String>()
+        Pattern<String, String> pattern = new QueryBuilder<String, String>()
                 .select("first")
-                .where((key, value, timestamp, store) -> value.equals("A"))
-                .followBy("second")
-                .where((key, value, timestamp, store) -> value.equals("B"))
-                .followBy("three")
-                .where((key, value, timestamp, store) -> value.equals("C"))
-                .withStrategy(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH)
-                .followBy("latest")
-                .where((key, value, timestamp, store) -> value.equals("D"))
-                .withStrategy(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH);
+                    .where((key, value, timestamp, store) -> value.equals("A"))
+                .then()
+                .select("second")
+                    .where((key, value, timestamp, store) -> value.equals("B"))
+                .then()
+                .select("three")
+                    .skipTillAnyMatch()
+                    .where((key, value, timestamp, store) -> value.equals("C"))
+                .then()
+                .select("latest")
+                    .skipTillAnyMatch()
+                    .where((key, value, timestamp, store) -> value.equals("D"))
+                .build();
 
         List<Stage<String, String>> stages = new NFAFactory<String, String>().make(pattern);
         DummyProcessorContext context = new DummyProcessorContext();
@@ -150,13 +169,12 @@ public class NFATest {
         assertEquals(expected2, s.get(1));
     }
 
-    private List<Sequence<String, String>> simulate(NFA<String, String> nfa, DummyProcessorContext context, Event<String, String>...e) {
-        List<Sequence<String, String>> s = new LinkedList<>();
-        List<Event<String, String>> events = Arrays.asList(e);
-        for(Event<String, String> event : events) {
-            assertTrue(s.isEmpty());
+    private <K, V> List<Sequence<K, V>> simulate(NFA<K, V> nfa, DummyProcessorContext context, Event<K, V>...e) {
+        List<Sequence<K, V>> s = new LinkedList<>();
+        List<Event<K, V>> events = Arrays.asList(e);
+        for(Event<K, V> event : events) {
             context.set(event.topic, event.partition, event.offset);
-            s = nfa.matchPattern(null, event.value, event.timestamp);
+            s.addAll(nfa.matchPattern(null, event.value, event.timestamp));
         }
         return s;
     }
@@ -168,11 +186,88 @@ public class NFATest {
         return new KVSharedVersionedBuffer<>(store);
     }
 
+    /**
+     * PATTERN SEQ(Stock+ a[ ], Stock b)
+     *  WHERE skip_till_next_match(a[ ], b) {
+     *      [symbol]
+     *  and
+     *      a[1].volume > 1000
+     *  and
+     *      a[i].price > avg(a[..i-1].price)
+     *  and
+     *      b.volume < 80%*a[a.LEN].volume }
+     *  WITHIN 1 hour
+     */
+    @Test
+    public void testComplexPatternWithState() {
+
+        StockEvent e1 = new StockEvent(100, 1010);
+        StockEvent e2 = new StockEvent(120, 990);
+        StockEvent e3 = new StockEvent(120, 1005);
+        StockEvent e4 = new StockEvent(121, 999);
+        StockEvent e5 = new StockEvent(120, 999);
+        StockEvent e6 = new StockEvent(125, 750);
+        StockEvent e7 = new StockEvent(120, 950);
+        StockEvent e8 = new StockEvent(120, 700);
+
+        Pattern<Object, StockEvent> pattern = new QueryBuilder<Object, StockEvent>()
+                .select()
+                    .where((k, v, ts, store) -> v.volume > 1000)
+                    .<Integer>fold("avg", (k, v, curr) -> v.price)
+                    .then()
+                .select()
+                    .zeroOrMore()
+                    .skipTillNextMatch()
+                    .where((k, v, ts, state) -> v.price > (int)state.get("avg"))
+                    .<Integer>fold("avg", (k, v, curr) -> (curr + v.price) / 2)
+                    .<Integer>fold("volume", (k, v, curr) -> v.volume)
+                    .then()
+                .select()
+                    .skipTillNextMatch()
+                    .where((k, v, ts, state) -> v.volume < 0.8 * state.getOrElse("volume", 0))
+                    .within(1, TimeUnit.HOURS)
+                .build();
+
+        List<Stage<Object, StockEvent>> stages = new NFAFactory<Object, StockEvent>().make(pattern);
+        DummyProcessorContext context = new DummyProcessorContext();
+        context.register(new MemoryLRUCache<>("avg", 100), false, null);
+        context.register(new MemoryLRUCache<>("volume", 100), false, null);
+        NFA<Object, StockEvent> nfa = new NFA<>(context, getInMemorySharedBuffer(), stages);
+
+        AtomicLong offset = new AtomicLong(0);
+        List<Event<Object, StockEvent>> collect = Arrays.asList(new StockEvent[]{e1, e2, e3, e4, e5, e6, e7, e8})
+                .stream().map(e -> new Event<>(null, e, System.currentTimeMillis(), "test", 0, offset.getAndIncrement()))
+                .collect(Collectors.toList());
+        List<Sequence<Object, StockEvent>> s = simulate(nfa, context, collect.toArray(new Event[collect.size()]));
+        assertEquals(4, s.size());
+    }
+
+    public static class StockEvent {
+        public final int price;
+        public final int volume;
+
+        public StockEvent(int price, int volume) {
+            this.price = price;
+            this.volume = volume;
+        }
+
+        @Override
+        public String toString() {
+            final StringBuilder sb = new StringBuilder("StockEvent{");
+            sb.append("price=").append(price);
+            sb.append(", volume=").append(volume);
+            sb.append('}');
+            return sb.toString();
+        }
+    }
+
     public static class DummyProcessorContext implements ProcessorContext {
 
         public int partition;
         public long offset;
         public String topic;
+
+        public Map<String, StateStore> stores = new HashMap<>();
 
         public void set(String topic, int partition, long offset) {
             this.topic = topic;
@@ -212,12 +307,12 @@ public class NFATest {
 
         @Override
         public void register(StateStore store, boolean loggingEnabled, StateRestoreCallback stateRestoreCallback) {
-
+            this.stores.put(store.name(), store);
         }
 
         @Override
         public StateStore getStateStore(String name) {
-            return null;
+            return stores.get(name);
         }
 
         @Override
