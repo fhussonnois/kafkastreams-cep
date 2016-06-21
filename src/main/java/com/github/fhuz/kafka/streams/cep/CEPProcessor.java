@@ -21,16 +21,20 @@ import com.github.fhuz.kafka.streams.cep.nfa.Stage;
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.KVSharedVersionedBuffer;
 import com.github.fhuz.kafka.streams.cep.pattern.NFAFactory;
 import com.github.fhuz.kafka.streams.cep.pattern.Pattern;
-import com.github.fhuz.kafka.streams.cep.nfa.buffer.KryoSerDe;
+import com.github.fhuz.kafka.streams.cep.serde.KryoSerDe;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.StateStoreSupplier;
 import org.apache.kafka.streams.state.Stores;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
 
 public class CEPProcessor<K, V> implements Processor<K, V> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(CEPProcessor.class);
 
     public static final String DEFAULT_STATE_STORE = "_cep_sharedbuffer_events";
 
@@ -38,7 +42,7 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
 
     private ProcessorContext context;
 
-    private NFA<K, V> processor;
+    private NFA<K, V> nfa;
 
     /**
      * Creates a new {@link CEPProcessor} instance.
@@ -52,11 +56,11 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
     public void init(ProcessorContext context) {
         this.context = context;
 
+        KVSharedVersionedBuffer<K, V> buffer = KVSharedVersionedBuffer.<K, V>getFactory().make(context);
+
         NFAFactory<K, V> fact = new NFAFactory<>();
         List<Stage<K, V>> stages = fact.make(pattern);
-
-        KVSharedVersionedBuffer<K, V> buffer = KVSharedVersionedBuffer.<K, V>getFactory().make(context);
-        this.processor = new NFA<>(context, buffer, stages);
+        this.nfa = new NFA<>(context, buffer, stages);
     }
 
     public static StateStoreSupplier getEventsStore(boolean isMemory) {
@@ -69,8 +73,8 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
 
     @Override
     public void process(K key, V value) {
-        long timestamp = context.timestamp();
-        List<Sequence<K, V>> sequences = this.processor.matchPattern(key, value, timestamp);
+        LOG.info("process {},{}", key, value);
+        List<Sequence<K, V>> sequences = this.nfa.matchPattern(key, value, context.timestamp());
         sequences.forEach( seq -> this.context.forward(null, seq));
     }
 

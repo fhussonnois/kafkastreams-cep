@@ -22,7 +22,6 @@ import com.github.fhuz.kafka.streams.cep.nfa.buffer.KVSharedVersionedBuffer;
 import com.github.fhuz.kafka.streams.cep.pattern.States;
 import com.github.fhuz.kafka.streams.cep.pattern.ValueStore;
 import com.github.fhuz.kafka.streams.cep.pattern.StateAggregator;
-import org.apache.kafka.common.utils.SystemTime;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.slf4j.Logger;
@@ -164,8 +163,10 @@ public class NFA<K, V> implements Serializable {
         long startTime = ctx.getFirstPatternTimestamp();
         boolean consumed = false;
         boolean ignored  = false;
+
         for(Stage.Edge<K, V> e : matchedEdges) {
             Stage<K, V> epsilonStage = newEpsilonState(currentStage, e.getTarget());
+            LOG.info("[{}]{} - {}", sequenceID, e.getOperation(), currentEvent);
             switch (e.getOperation()) {
                 case PROCEED:
                     ComputationContext<K, V> nextContext = ctx;
@@ -205,6 +206,7 @@ public class NFA<K, V> implements Serializable {
         }
 
         if(isBranching) {
+            LOG.info("new branch from event {}", currentEvent);
             UUID newSequenceId = UUID.randomUUID();
             Event<K, V> latestMatchEvent = ignored ? previousEvent : currentEvent;
             ComputationStage<K, V> newStage = new ComputationStage<>(newEpsilonState(previousStage, currentStage), version.addRun(), latestMatchEvent, startTime, newSequenceId);
@@ -212,8 +214,7 @@ public class NFA<K, V> implements Serializable {
             nextComputationStages.add(newStage);
             currentStage.getAggregates().forEach(agg -> newStageStateStore(agg.getName(), sequenceID).branch(newSequenceId));
 
-            if(consumed)
-                sharedVersionedBuffer.branch(previousStage, previousEvent, version);
+            sharedVersionedBuffer.branch(previousStage, previousEvent, version);
         }
 
         if( consumed ) evaluateAggregates(currentStage.getAggregates(), sequenceID, ctx.key, ctx.value);

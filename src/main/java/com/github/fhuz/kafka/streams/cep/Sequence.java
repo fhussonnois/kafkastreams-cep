@@ -43,6 +43,10 @@ public class Sequence<K, V> {
         return this.sequence.get(stage);
     }
 
+    public Map<String, List<Event<K, V>>> asMap() {
+        return this.sequence;
+    }
+
     /**
      * Returns the number of events contains into this sequence.
      */

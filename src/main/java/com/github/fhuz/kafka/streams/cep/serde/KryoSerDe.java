@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.fhuz.kafka.streams.cep.nfa.buffer;
+package com.github.fhuz.kafka.streams.cep.serde;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;

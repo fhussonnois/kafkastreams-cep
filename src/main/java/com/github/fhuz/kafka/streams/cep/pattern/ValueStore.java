@@ -18,6 +18,7 @@ package com.github.fhuz.kafka.streams.cep.pattern;
 
 import org.apache.kafka.streams.state.KeyValueStore;
 
+import java.io.Serializable;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -39,7 +40,7 @@ public class ValueStore<V> {
      */
     public ValueStore(String topic, int partition, UUID version, KeyValueStore<SequenceStateKey, V> backedStore) {
         this.backedStore = backedStore;
-        this.key = new SequenceStateKey(topic, partition, version);
+        this.key = new SequenceStateKey(topic, partition, version.toString());
     }
 
     /**
@@ -90,17 +91,22 @@ public class ValueStore<V> {
     public ValueStore branch(UUID newSeqId) {
         V o = get();
         if( o != null )
-            backedStore.put(new SequenceStateKey(key.topic, key.partition, newSeqId), o);
+            backedStore.put(new SequenceStateKey(key.topic, key.partition, newSeqId.toString()), o);
         return new ValueStore(this.key.topic, this.key.partition, newSeqId, this.backedStore);
     }
 
-    private static class SequenceStateKey {
+    private static class SequenceStateKey implements Comparable<SequenceStateKey>, Serializable {
 
-        public final String topic;
-        public final int partition;
-        public final UUID version;
+        public String topic;
+        public int partition;
+        public String version;
 
-        public SequenceStateKey(String topic, int partition, UUID version) {
+        /**
+         * Dummy constructor for serialization.
+         */
+        public SequenceStateKey(){}
+
+        public SequenceStateKey(String topic, int partition, String version) {
             this.topic = topic;
             this.partition = partition;
             this.version = version;
@@ -119,6 +125,16 @@ public class ValueStore<V> {
         @Override
         public int hashCode() {
             return Objects.hash(topic, partition, version);
+        }
+
+        @Override
+        public int compareTo(SequenceStateKey that) {
+            if( !this.topic.equals(that.topic) || this.partition != that.partition)
+                throw new IllegalArgumentException("Cannot compare event from different topic/partition");
+
+            if(this.partition > that.partition) return 1;
+            else if (this.partition < that.partition) return -1;
+            else return 0;
         }
     }
 }
