@@ -1,16 +1,13 @@
-Complex Event Processing on top of KafkaStreams Processor API
+Complex Event Processing on top of Kafka Streams Processor API
 =============================================================
 
-###This repository is not stable - library is still in progress (use at your own risk)
-
-## TODO / KNOWN ISSUES
- * NFA class is not tolerant to kafka rebalance operations.
- * A Stage state should be maintained per nfa run
- * NFA is not currently tolerant to at-least once semantic (keep a high water mark)
+This repository is not stable - This library is still in progress (use at your own risk)
 
 ## Demonstration
 
 The below example is based on the research paper **Efficient Pattern Matching over Event Streams**.
+
+Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
 
 ### CEP Query : 
 
@@ -63,6 +60,13 @@ The below example is based on the research paper **Efficient Pattern Matching ov
  * Strict contiguity
  * Skip till next match
  * Skip till any match
+ 
+
+### TODO
+ * Improve test scenarios
+ * NFA class is not tolerant to kafka rebalance operations.
+ * A Stage state should be maintained per nfa run
+ * NFA is not currently tolerant to at-least once semantic (keep a high water mark) 
  
 ###Licence
 Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements. See the NOTICE file distributed with this work for additional information regarding copyright ownership. The ASF licenses this file to you under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
