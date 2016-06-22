@@ -1,4 +1,4 @@
-package com.github.fhuz.kafka.streams.cep.nfa;
+package com.github.fhuz.kafka.streams.cep.demo;
 
 
 import com.github.fhuz.kafka.streams.cep.CEPProcessor;
@@ -15,10 +15,14 @@ import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.StateStoreSupplier;
 import org.apache.kafka.streams.processor.TopologyBuilder;
 import org.apache.kafka.streams.state.Stores;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
 
-import java.util.Objects;
+import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class CEPStockKStreamsDemo {
 
@@ -28,8 +32,8 @@ public class CEPStockKStreamsDemo {
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, "streams-cep");
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
         props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, "localhost:2181");
-        props.put(StreamsConfig.KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
-        props.put(StreamsConfig.VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
+        props.put(StreamsConfig.KEY_SERDE_CLASS_CONFIG, new StockEventSerDe().getClass());
+        props.put(StreamsConfig.VALUE_SERDE_CLASS_CONFIG, new StockEventSerDe().getClass());
 
         // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
@@ -37,45 +41,40 @@ public class CEPStockKStreamsDemo {
         Pattern<Object, StockEvent> pattern = new QueryBuilder<Object, StockEvent>()
                 .select()
                     .where((k, v, ts, store) -> v.volume > 1000)
-                    .<Integer>fold("avg", (k, v, curr) -> v.price)
+                    .<Long>fold("avg", (k, v, curr) -> v.price)
                     .then()
                 .select()
                     .zeroOrMore()
                     .skipTillNextMatch()
-                    .where((k, v, ts, state) -> v.price > (int)state.get("avg"))
-                    .<Integer>fold("avg", (k, v, curr) -> (curr + v.price) / 2)
-                    .<Integer>fold("volume", (k, v, curr) -> v.volume)
+                    .where((k, v, ts, state) -> v.price > (long)state.get("avg"))
+                    .<Long>fold("avg", (k, v, curr) -> (curr + v.price) / 2)
+                    .<Long>fold("volume", (k, v, curr) -> v.volume)
                     .then()
                 .select()
                     .skipTillNextMatch()
-                    .where((k, v, ts, state) -> v.volume < 0.8 * state.getOrElse("volume", 0))
-                .within(1, TimeUnit.HOURS)
+                    .where((k, v, ts, state) -> v.volume < 0.8 * state.getOrElse("volume", 0L))
+                    .within(1, TimeUnit.HOURS)
                 .build();
 
         TopologyBuilder topologyBuilder = new TopologyBuilder();
-        topologyBuilder.addSource("source", "StockEvents")
-                .addProcessor("map", () -> new AbstractProcessor<String, String>() {
-                    @Override
-                    public void doProcess(ProcessorContext context, String key, String value) {
-                        try {
-                            String[] split = value.split(",");
-                            context.forward(null, new StockEvent(Integer.parseInt(split[0]), Integer.parseInt(split[1])));
-                        } catch (NumberFormatException e) {
-                            //ignore
-                        }
-                    }
-                }, "source")
-                .addProcessor("cep", () -> new CEPProcessor<>(pattern), "map")
-                .addProcessor("print", () -> new AbstractProcessor<Object,  Sequence<Object, StockEvent>>() {
+        topologyBuilder.addSource("events", "StockEvents")
+                .addProcessor("cep", () -> new CEPProcessor<>(pattern), "events")
+                .addProcessor("matches", () -> new AbstractProcessor<Object,  Sequence<Object, StockEvent>>() {
                     @Override
                     public void doProcess(ProcessorContext context, Object key, Sequence<Object, StockEvent> sequence) {
+                        System.err.println("new sequence");
+                        JSONObject json = new JSONObject();
                         sequence.asMap().forEach( (k, v) -> {
-                            System.out.println(k + "->");
-                            System.out.println(v);
+                            JSONArray events = new JSONArray();
+                            json.put(k, events);
+                            List<String> collect = v.stream().map(e -> e.value.name).collect(Collectors.toList());
+                            Collections.reverse(collect);
+                            collect.forEach(e -> events.add(e));
                         });
+                        context.forward(null, json.toJSONString());
                     }
                 }, "cep")
-                .addSink("sink", "hello", "print");
+                .addSink("sink", "matches", Serdes.String().serializer(),Serdes.String().serializer(), "matches");
 
         // Required for buffer event matches
         topologyBuilder.addStateStore(CEPProcessor.getEventsStore(true), "cep");
@@ -120,29 +119,5 @@ public class CEPStockKStreamsDemo {
                 .withKeys(serde)
                 .withValues(serde);
         return isMemory ? factory.inMemory().build() : factory.persistent().build();
-    }
-
-    public static class StockEvent {
-        public int price;
-        public int volume;
-
-        /**
-         * Dummy constructor (Kryo)
-         */
-        public StockEvent(){}
-
-        public StockEvent(int price, int volume) {
-            this.price = price;
-            this.volume = volume;
-        }
-
-        @Override
-        public String toString() {
-            final StringBuilder sb = new StringBuilder("StockEvent{");
-            sb.append("price=").append(price);
-            sb.append(", volume=").append(volume);
-            sb.append('}');
-            return sb.toString();
-        }
     }
 }

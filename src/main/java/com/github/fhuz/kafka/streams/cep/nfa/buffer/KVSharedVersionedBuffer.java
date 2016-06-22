@@ -20,6 +20,7 @@ import com.github.fhuz.kafka.streams.cep.Sequence;
 import com.github.fhuz.kafka.streams.cep.nfa.Stage;
 import com.github.fhuz.kafka.streams.cep.nfa.DeweyVersion;
 import com.github.fhuz.kafka.streams.cep.Event;
+import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.state.KeyValueStore;
@@ -358,12 +359,13 @@ public class KVSharedVersionedBuffer<K , V> implements SharedVersionedBuffer<K, 
 
         @Override
         public int compareTo(StackEventKey<K, V> that) {
-            if( !this.topic.equals(that.topic) || this.partition != that.partition)
-                throw new IllegalArgumentException("Cannot compare event from different topic/partition");
 
-            if(this.offset > that.offset) return 1;
-            else if (this.offset < that.offset) return -1;
-            else return 0;
+            CompareToBuilder compareToBuilder = new CompareToBuilder();
+            return compareToBuilder.append(this.topic, that.topic)
+                            .append(this.partition, that.partition)
+                            .append(this.offset, that.offset)
+                            .append(this.state, that.state)
+                            .build();
         }
 
         @Override

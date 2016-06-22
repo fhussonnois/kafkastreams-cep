@@ -16,6 +16,7 @@
  */
 package com.github.fhuz.kafka.streams.cep.pattern;
 
+import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.kafka.streams.state.KeyValueStore;
 
 import java.io.Serializable;
@@ -35,12 +36,12 @@ public class ValueStore<V> {
      * Creates a new {@link ValueStore} instance.
      * @param topic
      * @param partition
-     * @param version
+     * @param run
      * @param backedStore
      */
-    public ValueStore(String topic, int partition, UUID version, KeyValueStore<SequenceStateKey, V> backedStore) {
+    public ValueStore(String topic, int partition, long run, KeyValueStore<SequenceStateKey, V> backedStore) {
         this.backedStore = backedStore;
-        this.key = new SequenceStateKey(topic, partition, version.toString());
+        this.key = new SequenceStateKey(topic, partition, run);
     }
 
     /**
@@ -84,29 +85,29 @@ public class ValueStore<V> {
 
     /**
      * Duplicates the underlying state for the specified sequence.
-     * @param newSeqId the new sequence identifier for which this state will be duplicate.
+     * @param run the new sequence identifier for which this state will be duplicate.
      * @return a new {@link ValueStore}.
      */
     @SuppressWarnings("unchecked")
-    public ValueStore branch(UUID newSeqId) {
+    public ValueStore branch(long run) {
         V o = get();
         if( o != null )
-            backedStore.put(new SequenceStateKey(key.topic, key.partition, newSeqId.toString()), o);
-        return new ValueStore(this.key.topic, this.key.partition, newSeqId, this.backedStore);
+            backedStore.put(new SequenceStateKey(key.topic, key.partition, run), o);
+        return new ValueStore(this.key.topic, this.key.partition, run, this.backedStore);
     }
 
     private static class SequenceStateKey implements Comparable<SequenceStateKey>, Serializable {
 
         public String topic;
         public int partition;
-        public String version;
+        public long version;
 
         /**
          * Dummy constructor for serialization.
          */
         public SequenceStateKey(){}
 
-        public SequenceStateKey(String topic, int partition, String version) {
+        public SequenceStateKey(String topic, int partition, long version) {
             this.topic = topic;
             this.partition = partition;
             this.version = version;
@@ -129,12 +130,11 @@ public class ValueStore<V> {
 
         @Override
         public int compareTo(SequenceStateKey that) {
-            if( !this.topic.equals(that.topic) || this.partition != that.partition)
-                throw new IllegalArgumentException("Cannot compare event from different topic/partition");
-
-            if(this.partition > that.partition) return 1;
-            else if (this.partition < that.partition) return -1;
-            else return 0;
+            CompareToBuilder compareToBuilder = new CompareToBuilder();
+            return compareToBuilder.append(this.topic, that.topic)
+                            .append(this.partition, that.partition)
+                            .append(this.version, that.version)
+                            .build();
         }
     }
 }

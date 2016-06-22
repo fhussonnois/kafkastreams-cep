@@ -28,14 +28,14 @@ public class States {
 
     private final ProcessorContext context;
 
-    private UUID version;
+    private long version;
 
     /**
      * Creates a new {@link States} instance.
      * @param context
      * @param version
      */
-    public States(ProcessorContext context, UUID version) {
+    public States(ProcessorContext context, long version) {
         this.context = context;
         this.version = version;
     }

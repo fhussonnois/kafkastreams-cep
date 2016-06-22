@@ -33,8 +33,8 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
-import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 /**
@@ -55,6 +55,8 @@ public class NFA<K, V> implements Serializable {
 
     private transient ProcessorContext context;
 
+    private AtomicLong runs = new AtomicLong(0);
+
     /**
      * Creates a new {@link NFA} instance.
      */
@@ -69,7 +71,7 @@ public class NFA<K, V> implements Serializable {
     private void initComputationStates(Collection<Stage<K, V>> stages) {
         stages.forEach(s -> {
             if (s.isBeginState())
-                computationStages.add(new ComputationStage<>(s, new DeweyVersion(1)));
+                computationStages.add(new ComputationStage<>(s, new DeweyVersion(1), runs.incrementAndGet()));
         });
     }
 
@@ -142,7 +144,7 @@ public class NFA<K, V> implements Serializable {
         if(ctx.getComputationStage().isBeginState() && !ctx.getComputationStage().isForwarding()) {
             DeweyVersion version = ctx.getComputationStage().getVersion();
             DeweyVersion newVersion = (nextComputationStages.isEmpty()) ? version : version.addRun();
-            nextComputationStages.add(new ComputationStage<>(ctx.getComputationStage().getStage(), newVersion));
+            nextComputationStages.add(new ComputationStage<>(ctx.getComputationStage().getStage(), newVersion, runs.incrementAndGet()));
         }
 
         return nextComputationStages;
@@ -150,7 +152,7 @@ public class NFA<K, V> implements Serializable {
 
     private Collection<ComputationStage<K, V>> evaluate(ComputationContext<K, V> ctx, Stage<K, V> currentStage, Stage<K, V> previousStage) {
         ComputationStage<K, V> computationStage = ctx.computationStage;
-        final UUID sequenceID = computationStage.getSequenceID();
+        final long sequenceID = computationStage.getSequence();
         final Event<K, V> previousEvent = computationStage.getEvent();
         final DeweyVersion version      = computationStage.getVersion();
 
@@ -166,7 +168,7 @@ public class NFA<K, V> implements Serializable {
 
         for(Stage.Edge<K, V> e : matchedEdges) {
             Stage<K, V> epsilonStage = newEpsilonState(currentStage, e.getTarget());
-            LOG.info("[{}]{} - {}", sequenceID, e.getOperation(), currentEvent);
+            LOG.debug("[{}]{} - {}", sequenceID, e.getOperation(), currentEvent);
             switch (e.getOperation()) {
                 case PROCEED:
                     ComputationContext<K, V> nextContext = ctx;
@@ -206,13 +208,13 @@ public class NFA<K, V> implements Serializable {
         }
 
         if(isBranching) {
-            LOG.info("new branch from event {}", currentEvent);
-            UUID newSequenceId = UUID.randomUUID();
+            LOG.debug("new branch from event {}", currentEvent);
+            long newSequence = runs.incrementAndGet();
             Event<K, V> latestMatchEvent = ignored ? previousEvent : currentEvent;
-            ComputationStage<K, V> newStage = new ComputationStage<>(newEpsilonState(previousStage, currentStage), version.addRun(), latestMatchEvent, startTime, newSequenceId);
+            ComputationStage<K, V> newStage = new ComputationStage<>(newEpsilonState(previousStage, currentStage), version.addRun(), latestMatchEvent, startTime, newSequence);
             newStage.setBranching(true);
             nextComputationStages.add(newStage);
-            currentStage.getAggregates().forEach(agg -> newStageStateStore(agg.getName(), sequenceID).branch(newSequenceId));
+            currentStage.getAggregates().forEach(agg -> newStageStateStore(agg.getName(), sequenceID).branch(newSequence));
 
             sharedVersionedBuffer.branch(previousStage, previousEvent, version);
         }
@@ -229,15 +231,15 @@ public class NFA<K, V> implements Serializable {
     }
 
     @SuppressWarnings("unchecked")
-    private void evaluateAggregates(List<StateAggregator<K, V, Object>> aggregates, UUID sequenceID, K key, V value) {
+    private void evaluateAggregates(List<StateAggregator<K, V, Object>> aggregates, long sequence, K key, V value) {
         aggregates.forEach(agg -> {
-            ValueStore store = newStageStateStore(agg.getName(), sequenceID);
+            ValueStore store = newStageStateStore(agg.getName(), sequence);
             store.set(agg.getAggregate().aggregate(key, value, store.get()));
         });
     }
 
-    private List<Stage.Edge<K, V>> matchEdgesAndGet(K key, V value, long timestamp, UUID seqId, Stage<K, V> currentStage) {
-        States store = new States(context, seqId);
+    private List<Stage.Edge<K, V>> matchEdgesAndGet(K key, V value, long timestamp, long sequence, Stage<K, V> currentStage) {
+        States store = new States(context, sequence);
         return currentStage.getEdges()
                 .stream()
                 .filter(e -> e.matches(key, value, timestamp, store))
@@ -245,7 +247,7 @@ public class NFA<K, V> implements Serializable {
     }
 
     @SuppressWarnings("unchecked")
-    private ValueStore newStageStateStore(String state, UUID seqId) {
+    private ValueStore newStageStateStore(String state, long seqId) {
         return new ValueStore(context.topic(), context.partition(), seqId, (KeyValueStore)context.getStateStore(state));
     }
 

@@ -46,31 +46,31 @@ public class ComputationStage<K, V> {
      */
     private DeweyVersion version;
 
-    private UUID sequenceID;
+    private long sequence;
 
     /**
      * Flag to indicate this computation stage is the first of a new branch.
      */
     private boolean isBranching = false;
 
-    public ComputationStage(Stage<K, V> stage, DeweyVersion version) {
-        this(stage, version, null, -1, UUID.randomUUID());
+    public ComputationStage(Stage<K, V> stage, DeweyVersion version, long sequence) {
+        this(stage, version, null, -1, sequence);
     }
 
-    public ComputationStage(Stage<K, V> stage, DeweyVersion version, Event<K, V> event, long timestamp, UUID sequenceID) {
+    public ComputationStage(Stage<K, V> stage, DeweyVersion version, Event<K, V> event, long timestamp, long sequence) {
         this.stage = stage;
         this.event = event;
         this.timestamp = timestamp;
         this.version = version;
-        this.sequenceID = sequenceID;
+        this.sequence = sequence;
     }
 
     public ComputationStage<K, V> setVersion(DeweyVersion version) {
-        return new ComputationStage<>(stage, version, event, timestamp, sequenceID);
+        return new ComputationStage<>(stage, version, event, timestamp, sequence);
     }
 
-    public UUID getSequenceID() {
-        return sequenceID;
+    public long getSequence() {
+        return sequence;
     }
 
     public void setBranching(boolean branching) {
@@ -127,7 +127,7 @@ public class ComputationStage<K, V> {
     }
 
     public ComputationStage<K, V> setEvent(Event<K, V> event) {
-        return new ComputationStage<>(stage, version, event, timestamp, sequenceID);
+        return new ComputationStage<>(stage, version, event, timestamp, sequence);
     }
 
     @Override

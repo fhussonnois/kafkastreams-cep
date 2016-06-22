@@ -26,7 +26,7 @@ Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-si
 ### KafkaStreams implementation:
 
 ```java
-        Pattern<Object, StockEvent> pattern = new SequenceQuery<Object, StockEvent>()
+        Pattern<Object, StockEvent> pattern = new QueryBuilder<Object, StockEvent>()
                 .select()
                     .where((k, v, ts, store) -> v.volume > 1000)
                     .<Integer>fold("avg", (k, v, curr) -> v.price)
@@ -48,14 +48,57 @@ Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-si
         topologyBuilder.addSource("source", "StockEvents")
                 .addProcessor("cep", () -> new CEPProcessor<>(query), "source");
 
-        topologyBuilder.addStateStore(CEPProcessor.getEventsStore(true), "cep");    // required for buffer event matches
-        topologyBuilder.addStateStore(CEPProcessor.getEventsStore(true), "volume"); // required for cep aggregates (i.e fold method)
-        topologyBuilder.addStateStore(CEPProcessor.getEventsStore(true), "avg");    // required for cep aggregates (i.e fold method)
+        // Required for buffer event matches
+        topologyBuilder.addStateStore(CEPProcessor.getEventsStore(true), "cep");
+
+        // Aggregates states (i.e fold method)
+        topologyBuilder.addStateStore(newStateStore("volume", true), "cep");
+        topologyBuilder.addStateStore(newStateStore("avg", true), "cep");
 
         //Use the topologyBuilder and streamingConfig to start the kafka streams process
-        KafkaStreams streaming = new KafkaStreams(topologyBuilder, streamingConfig);
+        KafkaStreams streaming = new KafkaStreams(topologyBuilder, props);
         streaming.start();
 ```
+
+## Demo
+
+Run the demonstration class **CEPStockKStreamsDemo** :
+
+- Produce the following json events **StockEvents**:
+```bash
+./bin/kafka-console-producer --topic StockEvents --broker-list localhost:9092
+```
+
+- Input
+
+```json
+
+{"name":"e1","price":100,"volume":1010}
+{"name":"e2","price":120,"volume":990}
+{"name":"e3","price":120,"volume":1005}
+{"name":"e4","price":121,"volume":999}
+{"name":"e5","price":120,"volume":999}
+{"name":"e6","price":125,"volume":750}
+{"name":"e7","price":120,"volume":950}
+{"name":"e8","price":120,"volume":700}
+    
+```
+
+
+- Consume from the sink topic **"matches"**
+
+```bash
+./bin/kafka-console-consumer --new-consumer --topic matches --bootstrap-server localhost:9092
+```
+- Output
+
+```json
+{"0":["e1"],"1":["e2","e3","e4","e5"],"2":["e6"]}
+{"0":["e3"],"1":["e4"],"2":["e6"]}
+{"0":["e1"],"1":["e2","e3","e4","e5","e6","e7"],"2":["e8"]}
+{"0":["e3"],"1":["e4","e6"],"2":["e8"]}
+```
+
 ## Support for event selection strategies
  * Strict contiguity
  * Skip till next match

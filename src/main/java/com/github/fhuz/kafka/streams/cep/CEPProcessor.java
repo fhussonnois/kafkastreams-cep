@@ -73,9 +73,10 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
 
     @Override
     public void process(K key, V value) {
-        LOG.info("process {},{}", key, value);
-        List<Sequence<K, V>> sequences = this.nfa.matchPattern(key, value, context.timestamp());
-        sequences.forEach( seq -> this.context.forward(null, seq));
+        if(value != null) {
+            List<Sequence<K, V>> sequences = this.nfa.matchPattern(key, value, context.timestamp());
+            sequences.forEach(seq -> this.context.forward(null, seq));
+        }
     }
 
     @Override
