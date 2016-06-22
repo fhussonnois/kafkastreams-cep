@@ -1,7 +1,11 @@
-Complex Event Processing on top of Kafka Streams Processor API
+Complex Event Processing on top of Kafka Streams Processor API !
 =============================================================
+![build status](https://travis-ci.org/fhussonnois/kafkastreams-cep.svg?branch=master)
+
+[Apache Kafka](http://kafka.apache.org/) is a high-throughput, distributed, publish-subscribe messaging system.
 
 This repository is not stable - This library is still in progress (use at your own risk)
+
 
 ## Demonstration
 
