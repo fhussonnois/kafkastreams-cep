@@ -1,9 +1,7 @@
 package com.github.fhuz.kafka.streams.cep.demo;
 
-
 import com.github.fhuz.kafka.streams.cep.CEPProcessor;
 import com.github.fhuz.kafka.streams.cep.Sequence;
-import com.github.fhuz.kafka.streams.cep.serde.KryoSerDe;
 import com.github.fhuz.kafka.streams.cep.pattern.Pattern;
 import com.github.fhuz.kafka.streams.cep.pattern.QueryBuilder;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -12,9 +10,7 @@ import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.ProcessorContext;
-import org.apache.kafka.streams.processor.StateStoreSupplier;
 import org.apache.kafka.streams.processor.TopologyBuilder;
-import org.apache.kafka.streams.state.Stores;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
@@ -32,13 +28,13 @@ public class CEPStockKStreamsDemo {
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, "streams-cep");
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
         props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, "localhost:2181");
-        props.put(StreamsConfig.KEY_SERDE_CLASS_CONFIG, new StockEventSerDe().getClass());
-        props.put(StreamsConfig.VALUE_SERDE_CLASS_CONFIG, new StockEventSerDe().getClass());
+        props.put(StreamsConfig.KEY_SERDE_CLASS_CONFIG, StockEventSerDe.class);
+        props.put(StreamsConfig.VALUE_SERDE_CLASS_CONFIG, StockEventSerDe.class);
 
         // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
-        Pattern<Object, StockEvent> pattern = new QueryBuilder<Object, StockEvent>()
+        final Pattern<Object, StockEvent> pattern = new QueryBuilder<Object, StockEvent>()
                 .select()
                     .where((k, v, ts, store) -> v.volume > 1000)
                     .<Long>fold("avg", (k, v, curr) -> v.price)
@@ -62,7 +58,6 @@ public class CEPStockKStreamsDemo {
                 .addProcessor("matches", () -> new AbstractProcessor<Object,  Sequence<Object, StockEvent>>() {
                     @Override
                     public void doProcess(ProcessorContext context, Object key, Sequence<Object, StockEvent> sequence) {
-                        System.err.println("new sequence");
                         JSONObject json = new JSONObject();
                         sequence.asMap().forEach( (k, v) -> {
                             JSONArray events = new JSONArray();
@@ -76,19 +71,12 @@ public class CEPStockKStreamsDemo {
                 }, "cep")
                 .addSink("sink", "matches", Serdes.String().serializer(),Serdes.String().serializer(), "matches");
 
-        // Required for buffer event matches
-        topologyBuilder.addStateStore(CEPProcessor.getEventsStore(true), "cep");
-
-        // Aggregates states (i.e fold method)
-        topologyBuilder.addStateStore(newStateStore("volume", true), "cep");
-        topologyBuilder.addStateStore(newStateStore("avg", true), "cep");
-
         //Use the topologyBuilder and streamingConfig to start the kafka streams process
         KafkaStreams streaming = new KafkaStreams(topologyBuilder, props);
         streaming.start();
     }
 
-    public static abstract class AbstractProcessor<K, V> implements Processor<K, V> {
+    static abstract class AbstractProcessor<K, V> implements Processor<K, V> {
         private ProcessorContext context;
         @Override
         public void init(ProcessorContext context) {
@@ -111,13 +99,5 @@ public class CEPStockKStreamsDemo {
         public void close() {
 
         }
-    }
-
-    public static StateStoreSupplier newStateStore(String name, boolean isMemory) {
-        KryoSerDe serde = new KryoSerDe();
-        Stores.KeyValueFactory factory = Stores.create(name)
-                .withKeys(serde)
-                .withValues(serde);
-        return isMemory ? factory.inMemory().build() : factory.persistent().build();
     }
 }

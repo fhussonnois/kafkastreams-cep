@@ -2,9 +2,11 @@ package com.github.fhuz.kafka.streams.cep.nfa;
 
 import com.github.fhuz.kafka.streams.cep.Event;
 import com.github.fhuz.kafka.streams.cep.Sequence;
-import com.github.fhuz.kafka.streams.cep.nfa.buffer.KVSharedVersionedBuffer;
+import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.KVSharedVersionedBuffer;
+import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.TimedKeyValue;
+import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.StackEventKey;
 import com.github.fhuz.kafka.streams.cep.pattern.QueryBuilder;
-import com.github.fhuz.kafka.streams.cep.pattern.NFAFactory;
+import com.github.fhuz.kafka.streams.cep.pattern.StatesFactory;
 import com.github.fhuz.kafka.streams.cep.pattern.Pattern;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.streams.StreamsMetrics;
@@ -50,7 +52,7 @@ public class NFATest {
                     .where((key, value, timestamp, store) -> value.equals("C"))
                 .build();
 
-        List<Stage<String, String>> stages = new NFAFactory<String, String>().make(query);
+        List<Stage<String, String>> stages = new StatesFactory<String, String>().make(query);
         DummyProcessorContext context = new DummyProcessorContext();
         NFA<String, String> nfa = new NFA<>(context, getInMemorySharedBuffer(), stages);
 
@@ -81,7 +83,7 @@ public class NFATest {
                     .where((key, value, timestamp, store) -> value.equals("D"))
                     .build();
 
-        List<Stage<String, String>> stages = new NFAFactory<String, String>().make(query);
+        List<Stage<String, String>> stages = new StatesFactory<String, String>().make(query);
         DummyProcessorContext context = new DummyProcessorContext();
         NFA<String, String> nfa = new NFA<>(context, getInMemorySharedBuffer(), stages);
 
@@ -115,7 +117,7 @@ public class NFATest {
                     .where((key, value, timestamp, store) -> value.equals("D"))
                 .build();
 
-        List<Stage<String, String>> stages = new NFAFactory<String, String>().make(pattern);
+        List<Stage<String, String>> stages = new StatesFactory<String, String>().make(pattern);
         DummyProcessorContext context = new DummyProcessorContext();
         NFA<String, String> nfa = new NFA<>(context, getInMemorySharedBuffer(), stages);
 
@@ -148,7 +150,7 @@ public class NFATest {
                     .where((key, value, timestamp, store) -> value.equals("D"))
                 .build();
 
-        List<Stage<String, String>> stages = new NFAFactory<String, String>().make(pattern);
+        List<Stage<String, String>> stages = new StatesFactory<String, String>().make(pattern);
         DummyProcessorContext context = new DummyProcessorContext();
         NFA<String, String> nfa = new NFA<>(context, getInMemorySharedBuffer(), stages);
 
@@ -182,7 +184,7 @@ public class NFATest {
 
     @SuppressWarnings("unchecked")
     private <K, V> KVSharedVersionedBuffer<K, V> getInMemorySharedBuffer() {
-        KeyValueStore<KVSharedVersionedBuffer.StackEventKey<K, V>, KVSharedVersionedBuffer.TimedKeyValue<K, V>> store = new MemoryLRUCache<>("test", 100);
+        KeyValueStore<StackEventKey, TimedKeyValue<K, V>> store = new MemoryLRUCache<>("test", 100);
         return new KVSharedVersionedBuffer<>(store);
     }
 
@@ -228,7 +230,7 @@ public class NFATest {
                     .within(1, TimeUnit.HOURS)
                 .build();
 
-        List<Stage<Object, StockEvent>> stages = new NFAFactory<Object, StockEvent>().make(pattern);
+        List<Stage<Object, StockEvent>> stages = new StatesFactory<Object, StockEvent>().make(pattern);
         DummyProcessorContext context = new DummyProcessorContext();
         context.register(new MemoryLRUCache<>("avg", 100), false, null);
         context.register(new MemoryLRUCache<>("volume", 100), false, null);

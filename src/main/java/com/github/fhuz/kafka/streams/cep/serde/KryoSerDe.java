@@ -19,6 +19,7 @@ package com.github.fhuz.kafka.streams.cep.serde;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
+import com.esotericsoftware.kryo.pool.KryoPool;
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.SharedVersionedBuffer;
 import org.apache.kafka.common.record.ByteBufferInputStream;
 import org.apache.kafka.common.serialization.Deserializer;
@@ -35,20 +36,24 @@ import java.util.Map;
  */
 public class KryoSerDe<T> implements Serde<T> {
 
-    private Kryo kryo;
+    private KryoPool pool;
 
+    private KryoSerDeserializer<T> kryoSerDeserializer;
 
     public KryoSerDe() {
-        initKryo();
+        init();
     }
 
     @Override
     public void configure(Map<String, ?> configs, boolean isKey) {
-        initKryo();
+        init();
     }
 
-    private void initKryo() {
-        this.kryo = new Kryo();
+    private void init() {
+        if (this.pool == null) {
+            this.pool = new KryoPool.Builder(Kryo::new).build();
+            this.kryoSerDeserializer = new KryoSerDeserializer<>(pool);
+        }
     }
 
     @Override
@@ -57,19 +62,20 @@ public class KryoSerDe<T> implements Serde<T> {
 
     @Override
     public Serializer<T> serializer() {
-        return new KryoSerDeserializer<>(kryo);
+        return kryoSerDeserializer;
     }
 
     @Override
     public Deserializer<T> deserializer() {
-        return new KryoSerDeserializer<>(kryo);
+        return new KryoSerDeserializer<>(pool);
     }
 
-    public static class KryoSerDeserializer<T> implements Serializer<T>, Deserializer<T> {
-        private Kryo kryo;
+    private static class KryoSerDeserializer<T> implements Serializer<T>, Deserializer<T> {
 
-        public KryoSerDeserializer(Kryo kryo) {
-            this.kryo = kryo;
+        private KryoPool kryoPool;
+
+        KryoSerDeserializer(KryoPool kryoPool) {
+            this.kryoPool = kryoPool;
         }
 
         @Override
@@ -80,17 +86,25 @@ public class KryoSerDe<T> implements Serde<T> {
         @Override
         @SuppressWarnings("unchecked")
         public T deserialize(String topic, byte[] data) {
+            if( data == null) return null;
+
+            Kryo kryo = kryoPool.borrow();
             ByteBufferInputStream bbis = new ByteBufferInputStream(ByteBuffer.wrap(data));
             Input input = new Input(bbis);
-            return  (T)kryo.readClassAndObject(input);
+            T result = (T) kryo.readClassAndObject(input);
+            this.kryoPool.release(kryo);
+
+            return result;
         }
 
         @Override
         public byte[] serialize(String topic, T data) {
+            Kryo kryo = kryoPool.borrow();
             ByteArrayOutputStream basos = new ByteArrayOutputStream();
             Output output = new Output(basos);
             kryo.writeClassAndObject(output, data);
             output.flush();
+            this.kryoPool.release(kryo);
             return basos.toByteArray();
         }
 
@@ -99,5 +113,4 @@ public class KryoSerDe<T> implements Serde<T> {
 
         }
     }
-
 }

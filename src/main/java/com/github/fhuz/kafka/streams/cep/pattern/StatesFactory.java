@@ -24,13 +24,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Default class to build a NFA based on a sequence pattern.
+ * Default class to build all states based on a sequence pattern.
  * Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
  *
  * @param <K> the type of the key event.
  * @param <V> the type of the value event.
  */
-public class NFAFactory<K, V> {
+public class StatesFactory<K, V> {
 
     /**
      * Compiles the specified {@link Pattern}.

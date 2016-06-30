@@ -6,11 +6,6 @@ public class StockEvent {
     public long price;
     public long volume;
 
-    /**
-     * Dummy constructor (Kryo)
-     */
-    public StockEvent(){}
-
     public StockEvent(String name, long price, long volume) {
         this.name = name;
         this.price = price;

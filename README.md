@@ -13,7 +13,7 @@ The below example is based on the research paper **Efficient Pattern Matching ov
 
 Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
 
-### CEP Query : 
+### CEP Query :
 
 ```
      PATTERN SEQ(Stock+ a[ ], Stock b)
@@ -52,13 +52,6 @@ Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-si
         topologyBuilder.addSource("source", "StockEvents")
                 .addProcessor("cep", () -> new CEPProcessor<>(query), "source");
 
-        // Required for buffer event matches
-        topologyBuilder.addStateStore(CEPProcessor.getEventsStore(true), "cep");
-
-        // Aggregates states (i.e fold method)
-        topologyBuilder.addStateStore(newStateStore("volume", true), "cep");
-        topologyBuilder.addStateStore(newStateStore("avg", true), "cep");
-
         //Use the topologyBuilder and streamingConfig to start the kafka streams process
         KafkaStreams streaming = new KafkaStreams(topologyBuilder, props);
         streaming.start();
@@ -85,7 +78,7 @@ Run the demonstration class **CEPStockKStreamsDemo** :
 {"name":"e6","price":125,"volume":750}
 {"name":"e7","price":120,"volume":950}
 {"name":"e8","price":120,"volume":700}
-    
+
 ```
 
 
@@ -107,14 +100,14 @@ Run the demonstration class **CEPStockKStreamsDemo** :
  * Strict contiguity
  * Skip till next match
  * Skip till any match
- 
+
 
 ### TODO
  * Improve test scenarios
  * NFA class is not tolerant to kafka rebalance operations.
  * A Stage state should be maintained per nfa run
- * NFA is not currently tolerant to at-least once semantic (keep a high water mark) 
- 
+ * NFA is not currently tolerant to at-least once semantic (keep a high water mark)
+
 ###Licence
 Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements. See the NOTICE file distributed with this work for additional information regarding copyright ownership. The ASF licenses this file to you under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
 

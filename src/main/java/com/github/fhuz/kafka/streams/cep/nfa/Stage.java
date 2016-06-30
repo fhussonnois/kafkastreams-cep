@@ -22,8 +22,11 @@ import com.github.fhuz.kafka.streams.cep.pattern.StateAggregator;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
@@ -57,11 +60,19 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
         this.aggregates = aggregator;
     }
 
-    public List<StateAggregator<K, V, Object>> getAggregates() {
+    List<StateAggregator<K, V, Object>> getAggregates() {
         return this.aggregates;
     }
 
-    public long getWindowMs() {
+    public Set<String> getStates() {
+        if( aggregates == null) return Collections.EMPTY_SET;
+        return getAggregates()
+                .stream()
+                .map(StateAggregator::getName)
+                .collect(Collectors.toSet());
+    }
+
+    long getWindowMs() {
         return this.windowMs;
     }
 
@@ -75,15 +86,15 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
         return this;
     }
 
-    public List<Edge<K, V>> getEdges() {
+    List<Edge<K, V>> getEdges() {
         return edges;
     }
 
-    public boolean isBeginState() {
+    boolean isBeginState() {
         return type.equals(StateType.BEGIN);
     }
 
-    public boolean isFinalState() {
+    boolean isFinalState() {
         return type.equals(StateType.FINAL);
     }
 
@@ -133,15 +144,15 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
             this.target = target;
         }
 
-        public EdgeOperation getOperation() {
+        EdgeOperation getOperation() {
             return operation;
         }
 
-        public boolean matches(K key, V value, long timestamp, States store) {
+        boolean matches(K key, V value, long timestamp, States store) {
             return predicate.matches(key, value, timestamp, store);
         }
 
-        public Stage<K, V> getTarget() {
+        Stage<K, V> getTarget() {
             return target;
         }
 

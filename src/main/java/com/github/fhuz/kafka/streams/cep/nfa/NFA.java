@@ -18,7 +18,7 @@ package com.github.fhuz.kafka.streams.cep.nfa;
 
 import com.github.fhuz.kafka.streams.cep.Event;
 import com.github.fhuz.kafka.streams.cep.Sequence;
-import com.github.fhuz.kafka.streams.cep.nfa.buffer.KVSharedVersionedBuffer;
+import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.KVSharedVersionedBuffer;
 import com.github.fhuz.kafka.streams.cep.pattern.States;
 import com.github.fhuz.kafka.streams.cep.pattern.ValueStore;
 import com.github.fhuz.kafka.streams.cep.pattern.StateAggregator;

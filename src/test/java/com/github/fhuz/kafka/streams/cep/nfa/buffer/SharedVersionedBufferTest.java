@@ -4,9 +4,10 @@ import com.github.fhuz.kafka.streams.cep.Sequence;
 import com.github.fhuz.kafka.streams.cep.nfa.Stage;
 import com.github.fhuz.kafka.streams.cep.nfa.DeweyVersion;
 import com.github.fhuz.kafka.streams.cep.Event;
+import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.KVSharedVersionedBuffer;
+import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.StackEventKey;
+import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.TimedKeyValue;
 import org.apache.kafka.streams.state.KeyValueStore;
-import com.github.fhuz.kafka.streams.cep.nfa.buffer.KVSharedVersionedBuffer.StackEventKey;
-import com.github.fhuz.kafka.streams.cep.nfa.buffer.KVSharedVersionedBuffer.TimedKeyValue;
 import org.apache.kafka.streams.state.internals.MemoryLRUCache;
 import org.junit.Test;
 
@@ -68,7 +69,7 @@ public class SharedVersionedBufferTest {
 
     @SuppressWarnings("unchecked")
     private <K, V> KVSharedVersionedBuffer<K, V> getInMemorySharedBuffer() {
-        KeyValueStore<StackEventKey<K, V>, TimedKeyValue<K, V>> store = new MemoryLRUCache<>("test", 100);
+        KeyValueStore<StackEventKey, TimedKeyValue<K, V>> store = new MemoryLRUCache<>("test", 100);
         return new KVSharedVersionedBuffer<>(store);
     }
 }

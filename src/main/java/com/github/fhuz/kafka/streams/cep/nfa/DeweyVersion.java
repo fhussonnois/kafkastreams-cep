@@ -26,8 +26,7 @@ public class DeweyVersion {
 
     private int[] versions;
 
-    public DeweyVersion() {
-    }
+    public DeweyVersion() {}
 
     /**
      * Creates a new {@link DeweyVersion} instance.

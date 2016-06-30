@@ -16,7 +16,6 @@
  */
 package com.github.fhuz.kafka.streams.cep;
 
-
 import java.util.Objects;
 
 /**
