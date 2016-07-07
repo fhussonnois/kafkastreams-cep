@@ -104,8 +104,7 @@ Run the demonstration class **CEPStockKStreamsDemo** :
 
 ### TODO
  * Improve test scenarios
- * NFA class is not tolerant to kafka rebalance operations.
- * A Stage state should be maintained per nfa run
+ * Allow to define multiple pattern queries per topic.
  * NFA is not currently tolerant to at-least once semantic (keep a high water mark)
 
 ###Licence
