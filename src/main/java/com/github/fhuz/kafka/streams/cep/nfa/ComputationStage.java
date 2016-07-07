@@ -19,7 +19,6 @@ package com.github.fhuz.kafka.streams.cep.nfa;
 import com.github.fhuz.kafka.streams.cep.Event;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
@@ -53,11 +52,11 @@ public class ComputationStage<K, V> {
      */
     private boolean isBranching = false;
 
-    public ComputationStage(Stage<K, V> stage, DeweyVersion version, long sequence) {
+    ComputationStage(Stage<K, V> stage, DeweyVersion version, long sequence) {
         this(stage, version, null, -1, sequence);
     }
 
-    public ComputationStage(Stage<K, V> stage, DeweyVersion version, Event<K, V> event, long timestamp, long sequence) {
+    ComputationStage(Stage<K, V> stage, DeweyVersion version, Event<K, V> event, long timestamp, long sequence) {
         this.stage = stage;
         this.event = event;
         this.timestamp = timestamp;
@@ -65,30 +64,45 @@ public class ComputationStage<K, V> {
         this.sequence = sequence;
     }
 
+    ComputationStage(Stage<K, V> stage, DeweyVersion version, Event<K, V> event, long timestamp, long sequence, boolean isBranching) {
+        this.stage = stage;
+        this.event = event;
+        this.timestamp = timestamp;
+        this.version = version;
+        this.sequence = sequence;
+        this.isBranching = isBranching;
+    }
+
     public ComputationStage<K, V> setVersion(DeweyVersion version) {
-        return new ComputationStage<>(stage, version, event, timestamp, sequence);
+        return new ComputationStageBuilder<K, V>()
+                .setStage(stage)
+                .setVersion(version)
+                .setEvent(event)
+                .setTimestamp(timestamp)
+                .setSequence(sequence)
+                .build();
     }
 
     public long getSequence() {
         return sequence;
     }
 
-    public void setBranching(boolean branching) {
+    void setBranching(boolean branching) {
         this.isBranching = branching;
     }
 
-    public boolean isBranching() {
+    boolean isBranching() {
         return isBranching;
     }
 
-    public boolean isOutOfWindow(long time) {
+    boolean isOutOfWindow(long time) {
         return stage.getWindowMs() != -1 && (time - timestamp) > stage.getWindowMs();
     }
 
     /**
      * @see {@link Stage#isBeginState()}.
      */
-    public boolean isBeginState() {
+    boolean isBeginState() {
         return stage.isBeginState();
     }
 
@@ -96,7 +110,7 @@ public class ComputationStage<K, V> {
      * Checks whether this {@link ComputationStage} is forwarding to the next state.
      * @return <code>true</code> if this computation contains a single "proceed" operation.
      */
-    public boolean isForwarding( ) {
+    boolean isForwarding() {
         List<Stage.Edge<K, V>> edges = stage.getEdges();
         return ( edges.size() == 1 && edges.get(0).is(EdgeOperation.PROCEED));
     }
@@ -104,7 +118,7 @@ public class ComputationStage<K, V> {
     /**
      * Checks whether this {@link ComputationStage} is forwarding to the final state.
      */
-    public boolean isForwardingToFinalState( ) {
+    boolean isForwardingToFinalState() {
         List<Stage.Edge<K, V>> edges = stage.getEdges();
         return ( isForwarding()
                 && edges.get(0).getTarget().isFinalState());
@@ -127,7 +141,7 @@ public class ComputationStage<K, V> {
     }
 
     public ComputationStage<K, V> setEvent(Event<K, V> event) {
-        return new ComputationStage<>(stage, version, event, timestamp, sequence);
+        return new ComputationStageBuilder().setStage(stage).setVersion(version).setEvent(event).setTimestamp(timestamp).setSequence(sequence).build();
     }
 
     @Override

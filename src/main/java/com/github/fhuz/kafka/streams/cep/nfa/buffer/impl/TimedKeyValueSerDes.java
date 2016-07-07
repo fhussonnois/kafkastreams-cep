@@ -16,36 +16,22 @@
  */
 package com.github.fhuz.kafka.streams.cep.nfa.buffer.impl;
 
-import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
-import org.apache.kafka.common.record.ByteBufferInputStream;
-import org.apache.kafka.common.serialization.Deserializer;
+import com.github.fhuz.kafka.streams.cep.serde.AbstractKryoSerde;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
-import org.apache.kafka.streams.StreamsConfig;
 
-import java.io.ByteArrayOutputStream;
-import java.nio.ByteBuffer;
 import java.util.Collection;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class TimedKeyValueSerDes<K, V> implements Serializer<TimedKeyValue<K, V>>, Deserializer<TimedKeyValue<K, V>> {
-
-    private Kryo kryo;
-
-    private Serde<K> keys;
-
-    private Serde<V> values;
+public class TimedKeyValueSerDes<K, V> extends AbstractKryoSerde<TimedKeyValue<K, V>, K, V> {
 
     /**
      * Creates a new {@link TimedKeyValueSerDes} instance.
      */
     public TimedKeyValueSerDes(Serde<K> keys, Serde<V> values) {
-        this.keys = keys;
-        this.values = values;
-        this.kryo = new Kryo();
+        super(keys, values);
     }
 
     /**
@@ -53,39 +39,22 @@ public class TimedKeyValueSerDes<K, V> implements Serializer<TimedKeyValue<K, V>
      */
     @Override
     @SuppressWarnings("unchecked")
-    public void configure(Map<String, ?> configs, boolean isKey) {
-    }
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    @SuppressWarnings("unchecked")
-    public TimedKeyValue<K, V> deserialize(String topic, byte[] data) {
-        if( data == null) return null;
-        try (Input input = new Input(new ByteBufferInputStream(ByteBuffer.wrap(data)))) {
-            long timestamp = input.readLong();
-            long refs = input.readLong();
-            Collection<TimedKeyValue.Pointer> processors = (Collection<TimedKeyValue.Pointer>)kryo.readClassAndObject(input);
-            int keyBytesSize = input.readInt();
-            K key = (keyBytesSize > 0) ? keys.deserializer().deserialize(topic, input.readBytes(keyBytesSize)) : null;
-            int valueBytesSize = input.readInt();
-            V value = (valueBytesSize > 0) ? values.deserializer().deserialize(topic, input.readBytes(valueBytesSize)) : null;
-            return new TimedKeyValue<>(timestamp, key, value, new AtomicLong(refs), processors);
-        }
-    }
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public byte[] serialize(String topic, TimedKeyValue<K, V> data) {
-        ByteArrayOutputStream basos = new ByteArrayOutputStream();
-        Output output = new Output(basos);
-        writeData(topic, data, output);
-        output.flush();
-        return basos.toByteArray();
+    protected TimedKeyValue<K, V> deserialize(String topic, Input input) {
+        long timestamp = input.readLong();
+        long refs = input.readLong();
+        Collection<TimedKeyValue.Pointer> processors = (Collection<TimedKeyValue.Pointer>)kryo.readClassAndObject(input);
+        int keyBytesSize = input.readInt();
+        K key = (keyBytesSize > 0) ? keys.deserializer().deserialize(topic, input.readBytes(keyBytesSize)) : null;
+        int valueBytesSize = input.readInt();
+        V value = (valueBytesSize > 0) ? values.deserializer().deserialize(topic, input.readBytes(valueBytesSize)) : null;
+        return new TimedKeyValue<>(timestamp, key, value, new AtomicLong(refs), processors);
     }
 
-    private void writeData(String topic, TimedKeyValue<K, V> data, Output output) {
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void serialize(String topic, TimedKeyValue<K, V> data, Output output) {
         output.writeLong(data.getTimestamp());
         output.writeLong(data.getRefs().longValue());
         kryo.writeClassAndObject(output, data.getPredecessors());

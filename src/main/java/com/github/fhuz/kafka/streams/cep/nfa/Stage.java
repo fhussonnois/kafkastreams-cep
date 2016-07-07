@@ -38,6 +38,13 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
     private long windowMs = -1;
     private List<StateAggregator<K, V, Object>> aggregates;
 
+
+    static <K, V> Stage<K, V> newEpsilonState(Stage<K, V> current, Stage<K, V> target) {
+        Stage<K, V> newStage = new Stage<>(current.getName(), current.getType());
+        newStage.addEdge(new Stage.Edge<>(EdgeOperation.PROCEED, (k, v, t, s) -> true, target));
+        return newStage;
+    }
+
     /**
      * Dummy constructor required by Kryo.
      */
@@ -117,6 +124,18 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
     @Override
     public int hashCode() {
         return Objects.hash(name, type);
+    }
+
+    boolean isEpsilonStage() {
+        return this.edges.size() == 1 && this.edges.get(0).getOperation().equals(EdgeOperation.PROCEED);
+    }
+
+    Stage<K, V> getTargetByOperation(EdgeOperation op) {
+        Stage<K, V> target = null;
+        for(Edge<K, V> edge : this.edges)
+            if( edge.getOperation().equals(op))
+                target = edge.target;
+        return target;
     }
 
     @Override

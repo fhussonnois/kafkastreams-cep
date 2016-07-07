@@ -49,34 +49,39 @@ public class NFA<K, V> implements Serializable {
 
     private KVSharedVersionedBuffer<K, V> sharedVersionedBuffer;
 
-    private Collection<Stage<K, V>> stages;
-
     private Queue<ComputationStage<K, V>> computationStages;
 
     private transient ProcessorContext context;
 
-    private AtomicLong runs = new AtomicLong(0);
+    private AtomicLong runs = new AtomicLong(1);
 
     /**
      * Creates a new {@link NFA} instance.
      */
     public NFA(ProcessorContext context, KVSharedVersionedBuffer<K, V> buffer, Collection<Stage<K, V>> stages) {
-        this.stages = stages;
-        this.context = context;
-        this.computationStages = new LinkedBlockingQueue<>();
-        this.sharedVersionedBuffer = buffer;
-        initComputationStates(stages);
+        this(context, buffer, initComputationStates(stages));
     }
 
-    private void initComputationStates(Collection<Stage<K, V>> stages) {
+    /**
+     * Creates a new {@link NFA} instance.
+     */
+    public NFA(ProcessorContext context, KVSharedVersionedBuffer<K, V> buffer, Queue<ComputationStage<K, V>> computationStages) {
+        this.context = context;
+        this.sharedVersionedBuffer = buffer;
+        this.computationStages = computationStages;
+    }
+
+    private static <K, V> Queue<ComputationStage<K, V>> initComputationStates(Collection<Stage<K, V>> stages) {
+        Queue<ComputationStage<K, V>> q = new LinkedBlockingQueue<>();
         stages.forEach(s -> {
             if (s.isBeginState())
-                computationStages.add(new ComputationStage<>(s, new DeweyVersion(1), runs.incrementAndGet()));
+                q.add(new ComputationStageBuilder().setStage(s).setVersion(new DeweyVersion(1)).setSequence(1L).build());
         });
+        return q;
     }
 
-    public Collection<Stage<K, V>> getStages() {
-        return stages;
+    public Queue<ComputationStage<K, V>> getComputationStages() {
+        return computationStages;
     }
 
     /**
@@ -144,7 +149,11 @@ public class NFA<K, V> implements Serializable {
         if(ctx.getComputationStage().isBeginState() && !ctx.getComputationStage().isForwarding()) {
             DeweyVersion version = ctx.getComputationStage().getVersion();
             DeweyVersion newVersion = (nextComputationStages.isEmpty()) ? version : version.addRun();
-            nextComputationStages.add(new ComputationStage<>(ctx.getComputationStage().getStage(), newVersion, runs.incrementAndGet()));
+            ComputationStageBuilder<K, V> builder = new ComputationStageBuilder<K, V>()
+                    .setStage(ctx.getComputationStage().getStage())
+                    .setVersion(newVersion)
+                    .setSequence(runs.incrementAndGet());
+            nextComputationStages.add(builder.build());
         }
 
         return nextComputationStages;
@@ -167,7 +176,7 @@ public class NFA<K, V> implements Serializable {
         boolean ignored  = false;
 
         for(Stage.Edge<K, V> e : matchedEdges) {
-            Stage<K, V> epsilonStage = newEpsilonState(currentStage, e.getTarget());
+            Stage<K, V> epsilonStage = Stage.newEpsilonState(currentStage, e.getTarget());
             LOG.debug("[{}]{} - {}", sequenceID, e.getOperation(), currentEvent);
             switch (e.getOperation()) {
                 case PROCEED:
@@ -183,7 +192,13 @@ public class NFA<K, V> implements Serializable {
                     // The event has matched the current event and not the next one.
                     if( ! isBranching ) {
                         // Re-add the current stage to NFA
-                        nextComputationStages.add(new ComputationStage<>(newEpsilonState(currentStage, currentStage), version, currentEvent, startTime, sequenceID));
+                        ComputationStageBuilder<K, V> builder = new ComputationStageBuilder<K, V>()
+                                .setStage(Stage.newEpsilonState(currentStage, currentStage))
+                                .setVersion(version)
+                                .setEvent(currentEvent)
+                                .setTimestamp(startTime)
+                                .setSequence(sequenceID);
+                        nextComputationStages.add(builder.build());
                         // Add the current event to buffer using current version path.
                         putToSharedBuffer(currentStage, previousStage, previousEvent, currentEvent, version);
                     } else {
@@ -196,7 +211,13 @@ public class NFA<K, V> implements Serializable {
                     // Add the current event to buffer using current version path
                     putToSharedBuffer(currentStage, previousStage, previousEvent, currentEvent, version);
                     // Compute the next stage in NFA
-                    nextComputationStages.add(new ComputationStage<>(epsilonStage, version, currentEvent, startTime, sequenceID));
+                    ComputationStageBuilder<K, V> builder = new ComputationStageBuilder<K, V>()
+                            .setStage(epsilonStage)
+                            .setVersion(version)
+                            .setEvent(currentEvent)
+                            .setTimestamp(startTime)
+                            .setSequence(sequenceID);
+                    nextComputationStages.add(builder.build());
                     consumed = true;
                     break;
                 case IGNORE:
@@ -211,9 +232,14 @@ public class NFA<K, V> implements Serializable {
             LOG.debug("new branch from event {}", currentEvent);
             long newSequence = runs.incrementAndGet();
             Event<K, V> latestMatchEvent = ignored ? previousEvent : currentEvent;
-            ComputationStage<K, V> newStage = new ComputationStage<>(newEpsilonState(previousStage, currentStage), version.addRun(), latestMatchEvent, startTime, newSequence);
-            newStage.setBranching(true);
-            nextComputationStages.add(newStage);
+            ComputationStageBuilder<K, V> builder = new ComputationStageBuilder<K, V>()
+                    .setStage(Stage.newEpsilonState(previousStage, currentStage))
+                    .setVersion(version.addRun())
+                    .setEvent(latestMatchEvent)
+                    .setTimestamp(startTime)
+                    .setSequence(newSequence)
+                    .setBranching(true);
+            nextComputationStages.add(builder.build());
             currentStage.getAggregates().forEach(agg -> newStageStateStore(agg.getName(), sequenceID).branch(newSequence));
 
             sharedVersionedBuffer.branch(previousStage, previousEvent, version);
@@ -249,13 +275,6 @@ public class NFA<K, V> implements Serializable {
     @SuppressWarnings("unchecked")
     private ValueStore newStageStateStore(String state, long seqId) {
         return new ValueStore(context.topic(), context.partition(), seqId, (KeyValueStore)context.getStateStore(state));
-    }
-
-    private Stage<K, V> newEpsilonState(Stage<K, V> current, Stage<K, V> target) {
-        Stage<K, V> newStage = new Stage<>(current.getName(), current.getType());
-        newStage.addEdge(new Stage.Edge<>(EdgeOperation.PROCEED, (k, v, t, s) -> true, target));
-
-        return newStage;
     }
 
     private boolean isBranching(Collection<Stage.Edge<K, V>> edges) {
