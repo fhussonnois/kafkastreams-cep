@@ -16,7 +16,7 @@
  */
 package com.github.fhuz.kafka.streams.cep.nfa;
 
-import com.github.fhuz.kafka.streams.cep.pattern.States;
+import com.github.fhuz.kafka.streams.cep.state.States;
 import com.github.fhuz.kafka.streams.cep.pattern.Matcher;
 import com.github.fhuz.kafka.streams.cep.pattern.StateAggregator;
 

@@ -14,37 +14,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.fhuz.kafka.streams.cep.pattern;
+package com.github.fhuz.kafka.streams.cep.state;
 
-import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.state.KeyValueStore;
-
-import java.util.UUID;
 
 /**
  * Simple class to wrap a {@link KeyValueStore}.
  */
 public class States {
 
-    private final ProcessorContext context;
+    private final StateStoreProvider provider;
 
-    private long version;
+    private long sequence;
 
     /**
      * Creates a new {@link States} instance.
-     * @param context
-     * @param version
+     * @param provider
+     * @param sequence
      */
-    public States(ProcessorContext context, long version) {
-        this.context = context;
-        this.version = version;
+    public States(StateStoreProvider provider, long sequence) {
+        this.provider = provider;
+        this.sequence = sequence;
     }
 
     /**
      * @see {@link KeyValueStore#get(Object)}
      */
     public Object get(String key) {
-        ValueStore store = newValueStore(key);
+        ValueStore store = provider.getValueStore(key, sequence);
         return ( store != null ) ? store.get() : null;
     }
 
@@ -53,17 +50,11 @@ public class States {
      */
     @SuppressWarnings("unchecked")
     public <T> T getOrElse(String key, T def) {
-        ValueStore store = newValueStore(key);
+        ValueStore store = provider.getValueStore(key, sequence);
         if ( store != null ) {
             T val = (T) store.get();
             return val != null ? val : def;
         }
         else return def;
-    }
-
-    @SuppressWarnings("unchecked")
-    private ValueStore newValueStore(String state) {
-        KeyValueStore store = (KeyValueStore) context.getStateStore(state);
-        return ( store != null ) ? new ValueStore(context.topic(), context.partition(), version, store) : null;
     }
 }

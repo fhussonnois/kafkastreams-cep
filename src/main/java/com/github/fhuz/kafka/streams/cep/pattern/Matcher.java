@@ -16,6 +16,8 @@
  */
 package com.github.fhuz.kafka.streams.cep.pattern;
 
+import com.github.fhuz.kafka.streams.cep.state.States;
+
 @FunctionalInterface
 public interface Matcher<K, V> {
 

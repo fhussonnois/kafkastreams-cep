@@ -54,7 +54,7 @@ public class CEPStockKStreamsDemo {
 
         TopologyBuilder topologyBuilder = new TopologyBuilder();
         topologyBuilder.addSource("events", "StockEvents")
-                .addProcessor("cep", () -> new CEPProcessor<>(pattern), "events")
+                .addProcessor("cep", () -> new CEPProcessor<>("Stocks", pattern), "events")
                 .addProcessor("matches", () -> new AbstractProcessor<Object,  Sequence<Object, StockEvent>>() {
                     @Override
                     public void doProcess(ProcessorContext context, Object key, Sequence<Object, StockEvent> sequence) {

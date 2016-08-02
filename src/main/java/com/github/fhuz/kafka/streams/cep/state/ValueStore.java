@@ -14,14 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.fhuz.kafka.streams.cep.pattern;
+package com.github.fhuz.kafka.streams.cep.state;
 
 import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.kafka.streams.state.KeyValueStore;
 
 import java.io.Serializable;
 import java.util.Objects;
-import java.util.UUID;
 
 /**
  * Simple class to wrap a {@link KeyValueStore}.

@@ -19,11 +19,10 @@ package com.github.fhuz.kafka.streams.cep.nfa;
 import com.github.fhuz.kafka.streams.cep.Event;
 import com.github.fhuz.kafka.streams.cep.Sequence;
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.KVSharedVersionedBuffer;
-import com.github.fhuz.kafka.streams.cep.pattern.States;
-import com.github.fhuz.kafka.streams.cep.pattern.ValueStore;
+import com.github.fhuz.kafka.streams.cep.state.States;
+import com.github.fhuz.kafka.streams.cep.state.ValueStore;
 import com.github.fhuz.kafka.streams.cep.pattern.StateAggregator;
-import org.apache.kafka.streams.processor.ProcessorContext;
-import org.apache.kafka.streams.state.KeyValueStore;
+import com.github.fhuz.kafka.streams.cep.state.StateStoreProvider;
 import org.slf4j.Logger;
 
 import java.io.Serializable;
@@ -47,26 +46,26 @@ public class NFA<K, V> implements Serializable {
 
     private static final Logger LOG = org.slf4j.LoggerFactory.getLogger(NFA.class);
 
+    private StateStoreProvider storeProvider;
+
     private KVSharedVersionedBuffer<K, V> sharedVersionedBuffer;
 
     private Queue<ComputationStage<K, V>> computationStages;
-
-    private transient ProcessorContext context;
 
     private AtomicLong runs = new AtomicLong(1);
 
     /**
      * Creates a new {@link NFA} instance.
      */
-    public NFA(ProcessorContext context, KVSharedVersionedBuffer<K, V> buffer, Collection<Stage<K, V>> stages) {
-        this(context, buffer, initComputationStates(stages));
+    public NFA(StateStoreProvider storeProvider, KVSharedVersionedBuffer<K, V> buffer, Collection<Stage<K, V>> stages) {
+        this(storeProvider, buffer, initComputationStates(stages));
     }
 
     /**
      * Creates a new {@link NFA} instance.
      */
-    public NFA(ProcessorContext context, KVSharedVersionedBuffer<K, V> buffer, Queue<ComputationStage<K, V>> computationStages) {
-        this.context = context;
+    public NFA(StateStoreProvider storeProvider, KVSharedVersionedBuffer<K, V> buffer, Queue<ComputationStage<K, V>> computationStages) {
+        this.storeProvider = storeProvider;
         this.sharedVersionedBuffer = buffer;
         this.computationStages = computationStages;
     }
@@ -87,18 +86,16 @@ public class NFA<K, V> implements Serializable {
     /**
      * Process the message with the given key and value.
      *
-     * @param key the key for the message
-     * @param value the value for the message
-     * @param timestamp The timestamp of the current event.
+     * @param event the event to match.
      */
-    public List<Sequence<K, V>> matchPattern(K key, V value, long timestamp) {
+    public List<Sequence<K, V>> matchPattern(Event<K, V> event) {
 
         int numberOfStateToProcess = computationStages.size();
 
         List<ComputationStage<K, V>> finalStates = new LinkedList<>();
         while(numberOfStateToProcess-- > 0) {
             ComputationStage<K, V> computationStage = computationStages.poll();
-            Collection<ComputationStage<K, V>> states = matchPattern(new ComputationContext<>(this.context, key, value, timestamp, computationStage));
+            Collection<ComputationStage<K, V>> states = matchPattern(new ComputationContext<>(event, computationStage));
             if( states.isEmpty() )
                 removePattern(computationStage);
             else
@@ -140,7 +137,7 @@ public class NFA<K, V> implements Serializable {
         Collection<ComputationStage<K, V>> nextComputationStages = new ArrayList<>();
 
         // Checks the time window of the current state.
-        if( !ctx.getComputationStage().isBeginState() && ctx.getComputationStage().isOutOfWindow(ctx.getTimestamp()) )
+        if( !ctx.getComputationStage().isBeginState() && ctx.getComputationStage().isOutOfWindow(ctx.getEvent().timestamp) )
             return nextComputationStages;
 
         nextComputationStages = evaluate(ctx, ctx.getComputationStage().getStage(), null);
@@ -165,7 +162,7 @@ public class NFA<K, V> implements Serializable {
         final Event<K, V> previousEvent = computationStage.getEvent();
         final DeweyVersion version      = computationStage.getVersion();
 
-        List<Stage.Edge<K, V>> matchedEdges = matchEdgesAndGet(ctx.key, ctx.value, ctx.timestamp, sequenceID, currentStage);
+        List<Stage.Edge<K, V>> matchedEdges = matchEdgesAndGet(ctx.event, sequenceID, currentStage);
 
         Collection<ComputationStage<K, V>> nextComputationStages = new ArrayList<>();
         final boolean isBranching = isBranching(matchedEdges);
@@ -184,7 +181,7 @@ public class NFA<K, V> implements Serializable {
                     // Checks whether epsilon operation is forwarding to a new stage and doesn't result from new branch.
                     if ( ! e.getTarget().equals(currentStage) && !ctx.computationStage.isBranching() ) {
                         ComputationStage<K, V> newStage = ctx.computationStage.setVersion(ctx.computationStage.getVersion().addStage());
-                        nextContext = new ComputationContext<>(this.context, ctx.key, ctx.value, ctx.timestamp, newStage);
+                        nextContext = new ComputationContext<>(ctx.event, newStage);
                     }
                     nextComputationStages.addAll(evaluate(nextContext, e.getTarget(), currentStage));
                     break;
@@ -240,12 +237,12 @@ public class NFA<K, V> implements Serializable {
                     .setSequence(newSequence)
                     .setBranching(true);
             nextComputationStages.add(builder.build());
-            currentStage.getAggregates().forEach(agg -> newStageStateStore(agg.getName(), sequenceID).branch(newSequence));
+            currentStage.getAggregates().forEach(agg -> storeProvider.getValueStore(agg.getName(), sequenceID).branch(newSequence));
 
             sharedVersionedBuffer.branch(previousStage, previousEvent, version);
         }
 
-        if( consumed ) evaluateAggregates(currentStage.getAggregates(), sequenceID, ctx.key, ctx.value);
+        if( consumed ) evaluateAggregates(currentStage.getAggregates(), sequenceID, ctx.event.key, ctx.event.value);
         return nextComputationStages;
     }
 
@@ -259,22 +256,18 @@ public class NFA<K, V> implements Serializable {
     @SuppressWarnings("unchecked")
     private void evaluateAggregates(List<StateAggregator<K, V, Object>> aggregates, long sequence, K key, V value) {
         aggregates.forEach(agg -> {
-            ValueStore store = newStageStateStore(agg.getName(), sequence);
+            ValueStore store = storeProvider.getValueStore(agg.getName(), sequence);
+            if( store == null) throw new IllegalStateException("State store is not defined: " + agg.getName());
             store.set(agg.getAggregate().aggregate(key, value, store.get()));
         });
     }
 
-    private List<Stage.Edge<K, V>> matchEdgesAndGet(K key, V value, long timestamp, long sequence, Stage<K, V> currentStage) {
-        States store = new States(context, sequence);
+    private List<Stage.Edge<K, V>> matchEdgesAndGet(Event<K, V> event, long sequence, Stage<K, V> currentStage) {
+        States store = new States(storeProvider, sequence);
         return currentStage.getEdges()
                 .stream()
-                .filter(e -> e.matches(key, value, timestamp, store))
+                .filter(e -> e.matches(event.key, event.value, event.timestamp, store))
                 .collect(Collectors.toList());
-    }
-
-    @SuppressWarnings("unchecked")
-    private ValueStore newStageStateStore(String state, long seqId) {
-        return new ValueStore(context.topic(), context.partition(), seqId, (KeyValueStore)context.getStateStore(state));
     }
 
     private boolean isBranching(Collection<Stage.Edge<K, V>> edges) {
@@ -293,51 +286,18 @@ public class NFA<K, V> implements Serializable {
      */
     private static class ComputationContext<K, V> {
         /**
-         * The current processor context.
-         */
-        private final ProcessorContext context;
-        /**
-         * The current event key.
-         */
-        private final K key;
-        /**
-         * The current event value.
-         */
-        private final V value;
-        /**
-         * The current event timestamp.
-         */
-        private final long timestamp;
-        /**
          * The current state to compute.
          */
         private final ComputationStage<K, V> computationStage;
 
+        private final Event<K, V> event;
+
         /**
          * Creates a new {@link ComputationContext} instance.
          */
-        private ComputationContext(ProcessorContext context, K key, V value, long timestamp, ComputationStage<K, V> computationStage) {
-            this.context = context;
-            this.key = key;
-            this.value = value;
-            this.timestamp = timestamp;
+        private ComputationContext(Event<K, V> event, ComputationStage<K, V> computationStage) {
+            this.event = event;
             this.computationStage = computationStage;
-        }
-
-        public ProcessorContext getContext() {
-            return context;
-        }
-
-        public K getKey() {
-            return key;
-        }
-
-        public V getValue() {
-            return value;
-        }
-
-        public long getTimestamp() {
-            return timestamp;
         }
 
         public ComputationStage<K, V> getComputationStage() {
@@ -345,11 +305,11 @@ public class NFA<K, V> implements Serializable {
         }
 
         public long getFirstPatternTimestamp() {
-            return computationStage.isBeginState() ? timestamp : computationStage.getTimestamp();
+            return computationStage.isBeginState() ? event.timestamp : computationStage.getTimestamp();
         }
 
         public Event<K, V> getEvent( ) {
-            return new Event<>(key, value, context.timestamp(), context.topic(), context.partition(), context.offset());
+            return event;
         }
     }
 }

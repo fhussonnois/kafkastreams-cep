@@ -6,8 +6,9 @@ import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.KVSharedVersionedBuffer
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.TimedKeyValue;
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.StackEventKey;
 import com.github.fhuz.kafka.streams.cep.pattern.QueryBuilder;
-import com.github.fhuz.kafka.streams.cep.pattern.StatesFactory;
+import com.github.fhuz.kafka.streams.cep.pattern.StagesFactory;
 import com.github.fhuz.kafka.streams.cep.pattern.Pattern;
+import com.github.fhuz.kafka.streams.cep.state.StateStoreProvider;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.streams.StreamsMetrics;
 import org.apache.kafka.streams.processor.ProcessorContext;
@@ -32,6 +33,7 @@ import static org.junit.Assert.*;
 
 public class NFATest {
 
+    public static final String PATTERN_TEST = "test";
     private Event<String, String> ev1 = new Event<>(null, "A", System.currentTimeMillis(), "test", 0, 0);
     private Event<String, String> ev2 = new Event<>(null, "B", System.currentTimeMillis(), "test", 0, 1);
     private Event<String, String> ev3 = new Event<>(null, "C", System.currentTimeMillis(), "test", 0, 2);
@@ -52,9 +54,9 @@ public class NFATest {
                     .where((key, value, timestamp, store) -> value.equals("C"))
                 .build();
 
-        List<Stage<String, String>> stages = new StatesFactory<String, String>().make(query);
+        List<Stage<String, String>> stages = new StagesFactory<String, String>().make(query);
         DummyProcessorContext context = new DummyProcessorContext();
-        NFA<String, String> nfa = new NFA<>(context, getInMemorySharedBuffer(), stages);
+        NFA<String, String> nfa = new NFA<>(new StateStoreProvider("test", context), getInMemorySharedBuffer(), stages);
 
         List<Sequence<String, String>> s = simulate(nfa, context, ev1, ev2, ev3);
         assertEquals(1, s.size());
@@ -83,9 +85,9 @@ public class NFATest {
                     .where((key, value, timestamp, store) -> value.equals("D"))
                     .build();
 
-        List<Stage<String, String>> stages = new StatesFactory<String, String>().make(query);
+        List<Stage<String, String>> stages = new StagesFactory<String, String>().make(query);
         DummyProcessorContext context = new DummyProcessorContext();
-        NFA<String, String> nfa = new NFA<>(context, getInMemorySharedBuffer(), stages);
+        NFA<String, String> nfa = new NFA<>(new StateStoreProvider("test", context), getInMemorySharedBuffer(), stages);
 
         List<Sequence<String, String>> s = simulate(nfa, context, ev1, ev2, ev3, ev4, ev5);
         assertEquals(1, s.size());
@@ -117,9 +119,9 @@ public class NFATest {
                     .where((key, value, timestamp, store) -> value.equals("D"))
                 .build();
 
-        List<Stage<String, String>> stages = new StatesFactory<String, String>().make(pattern);
+        List<Stage<String, String>> stages = new StagesFactory<String, String>().make(pattern);
         DummyProcessorContext context = new DummyProcessorContext();
-        NFA<String, String> nfa = new NFA<>(context, getInMemorySharedBuffer(), stages);
+        NFA<String, String> nfa = new NFA<>(new StateStoreProvider("test", context), getInMemorySharedBuffer(), stages);
 
         List<Sequence<String, String>> s = simulate(nfa, context, ev1, ev2, ev3, ev4, ev5);
         assertEquals(1, s.size());
@@ -150,9 +152,9 @@ public class NFATest {
                     .where((key, value, timestamp, store) -> value.equals("D"))
                 .build();
 
-        List<Stage<String, String>> stages = new StatesFactory<String, String>().make(pattern);
+        List<Stage<String, String>> stages = new StagesFactory<String, String>().make(pattern);
         DummyProcessorContext context = new DummyProcessorContext();
-        NFA<String, String> nfa = new NFA<>(context, getInMemorySharedBuffer(), stages);
+        NFA<String, String> nfa = new NFA<>(new StateStoreProvider("test", context), getInMemorySharedBuffer(), stages);
 
         List<Sequence<String, String>> s = simulate(nfa, context, ev1, ev2, ev3, ev4, ev5);
         assertEquals(2, s.size());
@@ -176,7 +178,7 @@ public class NFATest {
         List<Event<K, V>> events = Arrays.asList(e);
         for(Event<K, V> event : events) {
             context.set(event.topic, event.partition, event.offset);
-            s.addAll(nfa.matchPattern(null, event.value, event.timestamp));
+            s.addAll(nfa.matchPattern(event));
         }
         return s;
     }
@@ -230,11 +232,11 @@ public class NFATest {
                     .within(1, TimeUnit.HOURS)
                 .build();
 
-        List<Stage<Object, StockEvent>> stages = new StatesFactory<Object, StockEvent>().make(pattern);
+        List<Stage<Object, StockEvent>> stages = new StagesFactory<Object, StockEvent>().make(pattern);
         DummyProcessorContext context = new DummyProcessorContext();
-        context.register(new MemoryLRUCache<>("avg", 100), false, null);
-        context.register(new MemoryLRUCache<>("volume", 100), false, null);
-        NFA<Object, StockEvent> nfa = new NFA<>(context, getInMemorySharedBuffer(), stages);
+        context.register(new MemoryLRUCache<>(StateStoreProvider.getStateStoreName(PATTERN_TEST, "avg" ), 100), false, null);
+        context.register(new MemoryLRUCache<>(StateStoreProvider.getStateStoreName(PATTERN_TEST, "volume" ), 100), false, null);
+        NFA<Object, StockEvent> nfa = new NFA<>(new StateStoreProvider(PATTERN_TEST, context), getInMemorySharedBuffer(), stages);
 
         AtomicLong offset = new AtomicLong(0);
         List<Event<Object, StockEvent>> collect = Arrays.asList(new StockEvent[]{e1, e2, e3, e4, e5, e6, e7, e8})

@@ -30,7 +30,7 @@ import java.util.List;
  * @param <K> the type of the key event.
  * @param <V> the type of the value event.
  */
-public class StatesFactory<K, V> {
+public class StagesFactory<K, V> {
 
     /**
      * Compiles the specified {@link Pattern}.
@@ -50,19 +50,19 @@ public class StatesFactory<K, V> {
         Pattern<K, V> currentPattern   = pattern;
 
         while( currentPattern.getAncestor() != null) {
-            successorStage = buildState(Stage.StateType.NORMAL, currentPattern, successorStage, successorPattern);
+            successorStage = buildStage(Stage.StateType.NORMAL, currentPattern, successorStage, successorPattern);
             sequence.add(successorStage);
             successorPattern = currentPattern;
             currentPattern = currentPattern.getAncestor();
         }
 
-        Stage<K, V> beginStage = buildState(Stage.StateType.BEGIN, currentPattern, successorStage, successorPattern);
+        Stage<K, V> beginStage = buildStage(Stage.StateType.BEGIN, currentPattern, successorStage, successorPattern);
         sequence.add(beginStage);
 
         return sequence;
     }
 
-    private Stage<K, V> buildState(Stage.StateType type, Pattern<K, V> currentPattern, Stage<K, V> successorStage, Pattern<K, V> successorPattern) {
+    private Stage<K, V> buildStage(Stage.StateType type, Pattern<K, V> currentPattern, Stage<K, V> successorStage, Pattern<K, V> successorPattern) {
 
         Pattern.Cardinality cardinality = currentPattern.getCardinality();
         Stage.StateType currentType = type;

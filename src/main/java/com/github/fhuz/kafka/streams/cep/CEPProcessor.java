@@ -22,8 +22,9 @@ import com.github.fhuz.kafka.streams.cep.nfa.NFA;
 import com.github.fhuz.kafka.streams.cep.nfa.Stage;
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.KVSharedVersionedBuffer;
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.TimedKeyValueSerDes;
-import com.github.fhuz.kafka.streams.cep.pattern.StatesFactory;
+import com.github.fhuz.kafka.streams.cep.pattern.StagesFactory;
 import com.github.fhuz.kafka.streams.cep.pattern.Pattern;
+import com.github.fhuz.kafka.streams.cep.state.StateStoreProvider;
 import com.github.fhuz.kafka.streams.cep.serde.KryoSerDe;
 import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.kafka.common.serialization.Serde;
@@ -51,25 +52,28 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
 
     private static final Logger LOG = LoggerFactory.getLogger(CEPProcessor.class);
 
-    private static final String BUFFER_EVENT_STORE = "_cep_buffer_events";
-
-    private static final String NFA_STATES_STORE   = "_cep_nfa";
-
     private List<Stage<K, V>> stages;
 
     private ProcessorContext context;
+
+    private String queryName;
 
     private boolean inMemory;
 
     private NFA<K, V> nfa;
 
+    private final String bufferStateStoreName;
+
+    private final String nfaStateStoreName;
+
     /**
      * Creates a new {@link CEPProcessor} instance.
      *
+     * @param queryName
      * @param pattern
      */
-    public CEPProcessor(Pattern<K, V> pattern) {
-        this(pattern, false);
+    public CEPProcessor(String queryName, Pattern<K, V> pattern) {
+        this(queryName, pattern, false);
     }
 
     /**
@@ -77,10 +81,14 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
      *
      * @param pattern
      */
-    public CEPProcessor(Pattern<K, V> pattern, boolean inMemory) {
-        StatesFactory<K, V> fact = new StatesFactory<>();
+    public CEPProcessor(String queryName, Pattern<K, V> pattern, boolean inMemory) {
+        StagesFactory<K, V> fact = new StagesFactory<>();
         this.stages = fact.make(pattern);
         this.inMemory = inMemory;
+        this.queryName = queryName;
+
+        this.bufferStateStoreName = StateStoreProvider.getEventBufferStoreName(queryName);
+        this.nfaStateStoreName    = StateStoreProvider.getNFAStoreName(queryName);
     }
 
     @Override
@@ -90,18 +98,18 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
 
         KryoSerDe kryoSerDe = new KryoSerDe();
         Set<StateStoreSupplier> stateStoreSuppliers = getDefinedStateNames(stages)
-                .map(s -> getStateStoreSupplier(s, kryoSerDe, kryoSerDe, inMemory))
+                .map(s -> getStateStoreSupplier(StateStoreProvider.getStateStoreName(queryName, s), kryoSerDe, kryoSerDe, inMemory))
                 .collect(Collectors.toSet());
 
         Serde<?> keySerde = this.context.keySerde();
         Serde<?> valSerde = this.context.valueSerde();
 
         TimedKeyValueSerDes<K, V> timedKeyValueSerDes = new TimedKeyValueSerDes(keySerde, valSerde);
-        stateStoreSuppliers.add(getStateStoreSupplier(BUFFER_EVENT_STORE, kryoSerDe,
+        stateStoreSuppliers.add(getStateStoreSupplier(bufferStateStoreName, kryoSerDe,
                 Serdes.serdeFrom(timedKeyValueSerDes, timedKeyValueSerDes), inMemory));
 
         ComputationStageSerDe<K, V> computationStageSerDes = new ComputationStageSerDe(stages, keySerde, valSerde);
-        stateStoreSuppliers.add(getStateStoreSupplier(NFA_STATES_STORE, kryoSerDe,
+        stateStoreSuppliers.add(getStateStoreSupplier(nfaStateStoreName, kryoSerDe,
                 Serdes.serdeFrom(computationStageSerDes, computationStageSerDes), inMemory));
 
         initializeStateStores(stateStoreSuppliers);
@@ -122,12 +130,12 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
             TopicAndPartition tp = new TopicAndPartition(context.topic(), context.partition());
             Queue<ComputationStage<K, V>> computationStages = nfaStore.get(tp);
 
-            KVSharedVersionedBuffer<K, V> buffer = bufferFactory.make(context, BUFFER_EVENT_STORE);
+            KVSharedVersionedBuffer<K, V> buffer = bufferFactory.make(context, bufferStateStoreName);
             if (computationStages != null) {
                 LOG.info("Loading existing nfa states for {}", tp);
-                this.nfa = new NFA<>(context, buffer, computationStages);
+                this.nfa = new NFA<>(new StateStoreProvider(queryName, context), buffer, computationStages);
             } else {
-                this.nfa = new NFA<>(context, buffer, stages);
+                this.nfa = new NFA<>(new StateStoreProvider(queryName, context), buffer, stages);
             }
         }
         return this.nfa;
@@ -137,7 +145,7 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
         for (StateStoreSupplier stateStoreSupplier : suppliers) {
             StateStore store = stateStoreSupplier.get();
             store.init(this.context, store);
-            LOG.info("State store registered with name {}", store.name());
+            LOG.info("State store registered with queryName {}", store.name());
         }
     }
 
@@ -155,7 +163,8 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
     public void process(K key, V value) {
         initializeIfNotAndGet(this.stages);
         if(value != null) {
-            List<Sequence<K, V>> sequences = this.nfa.matchPattern(key, value, context.timestamp());
+            Event<K, V> event = new Event<>(key, value, context.timestamp(), context.topic(), context.partition(), context.offset());
+            List<Sequence<K, V>> sequences = this.nfa.matchPattern(event);
             KeyValueStore<TopicAndPartition, Queue<ComputationStage<K, V>>> store = getNFAStore();
             store.put(new TopicAndPartition(context.topic(), context.partition()), this.nfa.getComputationStages());
             sequences.forEach(seq -> this.context.forward(null, seq));
@@ -164,7 +173,7 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
 
     @SuppressWarnings("unchecked")
     private KeyValueStore<TopicAndPartition, Queue<ComputationStage<K, V>>> getNFAStore() {
-        return (KeyValueStore<TopicAndPartition, Queue<ComputationStage<K, V>>>)this.context.getStateStore(NFA_STATES_STORE);
+        return (KeyValueStore<TopicAndPartition, Queue<ComputationStage<K, V>>>)this.context.getStateStore(nfaStateStoreName);
     }
 
     @Override
