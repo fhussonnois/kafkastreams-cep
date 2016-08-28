@@ -4,6 +4,18 @@ Complex Event Processing on top of Kafka Streams Processor API !
 
 [Apache Kafka](http://kafka.apache.org/) is a high-throughput, distributed, publish-subscribe messaging system.
 
+This library can be used to extend the [Kafka Streams API](http://kafka.apache.org/documentation.html#streams) in order to select complex event sequences from streams.
+
+It provides a convenient DSL to build complex event queries. 
+
+Currently, this library supports the following event selection strategies :  
+
+ * `Strict contiguity` :  Selected events must be contiguous in the input stream.
+
+ * `Skip till next match` :Irrelevant events are skipped until an event matching the next pattern is encountered. If multiple events in the stream can match the next pattern only the first of them is selected.
+
+ * `Skip till any match` : Irrelevant events are skipped until an event matching the next pattern is encountered. All events in the stream that can match a pattern are selected.
+ 
 ## Demonstration
 
 The below example is based on the research paper **Efficient Pattern Matching over Event Streams**.
@@ -113,12 +125,6 @@ Run the demonstration class **CEPStockKStreamsDemo** :
 {"0":["e1"],"1":["e2","e3","e4","e5","e6","e7"],"2":["e8"]}
 {"0":["e3"],"1":["e4","e6"],"2":["e8"]}
 ```
-
-## Support for event selection strategies
- * Strict contiguity
- * Skip till next match
- * Skip till any match
-
 
 ## TODO
  * Improve test scenarios
