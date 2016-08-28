@@ -68,9 +68,7 @@ public class ComputationStageSerDe<K, V>  extends AbstractKryoSerde<Queue<Comput
 
             Stage<K, V> currentStage = stagesKeyedByNames.get(stageName);
 
-            Event<K, V> event = null;
-            if( ! currentStage.isBeginState() )
-                event = deserializeEvent(topic, input);
+            Event<K, V> event = deserializeEvent(topic, input);
 
             if( isEpsilon ) {
                 String targetStageName = input.readString();
@@ -85,17 +83,21 @@ public class ComputationStageSerDe<K, V>  extends AbstractKryoSerde<Queue<Comput
     }
 
     private Event<K, V> deserializeEvent(String topic, Input input) {
-        long eventOffset    = input.readLong();
-        int eventPartition  = input.readInt();
-        String eventTopic   = input.readString();
-        long eventTimestamp = input.readLong();
+        boolean hasEvent = input.readBoolean();
+        if( hasEvent ) {
+            long eventOffset = input.readLong();
+            int eventPartition = input.readInt();
+            String eventTopic = input.readString();
+            long eventTimestamp = input.readLong();
 
-        int keyBytesSize = input.readInt();
-        K key = (keyBytesSize > 0) ? keys.deserializer().deserialize(topic, input.readBytes(keyBytesSize)) : null;
-        int valueBytesSize = input.readInt();
-        V value = (valueBytesSize > 0) ? values.deserializer().deserialize(topic, input.readBytes(valueBytesSize)) : null;
+            int keyBytesSize = input.readInt();
+            K key = (keyBytesSize > 0) ? keys.deserializer().deserialize(topic, input.readBytes(keyBytesSize)) : null;
+            int valueBytesSize = input.readInt();
+            V value = (valueBytesSize > 0) ? values.deserializer().deserialize(topic, input.readBytes(valueBytesSize)) : null;
 
-        return new Event<>(key, value, eventTimestamp, eventTopic, eventPartition, eventOffset);
+            return new Event<>(key, value, eventTimestamp, eventTopic, eventPartition, eventOffset);
+        }
+        return null;
     }
 
     /**
@@ -114,9 +116,8 @@ public class ComputationStageSerDe<K, V>  extends AbstractKryoSerde<Queue<Comput
             output.writeString(data.getVersion().toString());
             output.writeString(stage.getName());
             output.writeBoolean(stage.isEpsilonStage());
+            serializeEvent(topic, data, output);
 
-            if( ! data.isBeginState() )
-                serializeEvent(topic, data, output);
 
             if (stage.isEpsilonStage()) {
                 output.writeString(stage.getTargetByOperation(EdgeOperation.PROCEED).getName());
@@ -126,12 +127,16 @@ public class ComputationStageSerDe<K, V>  extends AbstractKryoSerde<Queue<Comput
 
     private void serializeEvent(String topic, ComputationStage<K, V> data, Output output) {
         Event<K, V> event = data.getEvent();
-        output.writeLong(event.offset);
-        output.writeInt(event.partition);
-        output.writeString(event.topic);
-        output.writeLong(event.timestamp);
-        write(topic, keys.serializer(), event.key, output);
-        write(topic, values.serializer(), event.value, output);
+        boolean hasEvent = event != null;
+        output.writeBoolean(hasEvent);
+        if ( hasEvent ) {
+            output.writeLong(event.offset);
+            output.writeInt(event.partition);
+            output.writeString(event.topic);
+            output.writeLong(event.timestamp);
+            write(topic, keys.serializer(), event.key, output);
+            write(topic, values.serializer(), event.value, output);
+        }
     }
 
     private <T> void write(String topic, Serializer<T> ser, T value, Output output) {

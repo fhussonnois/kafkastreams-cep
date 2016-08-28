@@ -91,7 +91,7 @@ public class CEPStockKStreamsDemo {
 
         //Use the topologyBuilder and streamingConfig to start the kafka streams process
         KafkaStreams streaming = new KafkaStreams(builder, props);
-        streaming.cleanUp();
+        //streaming.cleanUp();
         streaming.start();
     }
 }

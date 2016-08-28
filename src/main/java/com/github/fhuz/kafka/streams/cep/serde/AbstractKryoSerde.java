@@ -36,6 +36,10 @@ public abstract class AbstractKryoSerde <T, K, V>  implements Serializer<T>, Des
 
     protected Serde<V> values;
 
+    public AbstractKryoSerde(AbstractKryoSerde serde) {
+        this(serde.keys, serde.values);
+    }
+
     /**
      * Creates a new {@link AbstractKryoSerde} instance.
      */

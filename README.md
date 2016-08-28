@@ -120,15 +120,14 @@ Run the demonstration class **CEPStockKStreamsDemo** :
  * Skip till any match
 
 
-### TODO
+## TODO
  * Improve test scenarios
- * NFA is not currently tolerant to at-least once semantic (keep a high water mark)
  * Add support for streams grouped by key
 
-###Contributions
+## Contributions
 Any contribution is welcome
 
-###Licence
+## Licence
 Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements. See the NOTICE file distributed with this work for additional information regarding copyright ownership. The ASF licenses this file to you under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
 
 http://www.apache.org/licenses/LICENSE-2.0

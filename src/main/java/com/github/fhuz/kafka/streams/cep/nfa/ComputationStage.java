@@ -141,7 +141,13 @@ public class ComputationStage<K, V> {
     }
 
     public ComputationStage<K, V> setEvent(Event<K, V> event) {
-        return new ComputationStageBuilder().setStage(stage).setVersion(version).setEvent(event).setTimestamp(timestamp).setSequence(sequence).build();
+        return new ComputationStageBuilder<K, V>()
+                .setStage(stage)
+                .setVersion(version)
+                .setEvent(event)
+                .setTimestamp(timestamp)
+                .setSequence(sequence)
+                .build();
     }
 
     @Override

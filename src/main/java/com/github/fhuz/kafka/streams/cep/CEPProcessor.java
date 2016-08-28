@@ -27,8 +27,10 @@ import com.github.fhuz.kafka.streams.cep.pattern.Pattern;
 import com.github.fhuz.kafka.streams.cep.state.StateStoreProvider;
 import com.github.fhuz.kafka.streams.cep.serde.KryoSerDe;
 import org.apache.commons.lang3.builder.CompareToBuilder;
+import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.StateStore;
@@ -39,8 +41,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
@@ -65,6 +70,8 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
     private final String bufferStateStoreName;
 
     private final String nfaStateStoreName;
+
+    private Long highwatermark = -1L;
 
     /**
      * Creates a new {@link CEPProcessor} instance.
@@ -108,9 +115,9 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
         stateStoreSuppliers.add(getStateStoreSupplier(bufferStateStoreName, kryoSerDe,
                 Serdes.serdeFrom(timedKeyValueSerDes, timedKeyValueSerDes), inMemory));
 
-        ComputationStageSerDe<K, V> computationStageSerDes = new ComputationStageSerDe(stages, keySerde, valSerde);
+        NFASTateValueSerDe valueSerDe = new NFASTateValueSerDe(new ComputationStageSerDe(stages, keySerde, valSerde));
         stateStoreSuppliers.add(getStateStoreSupplier(nfaStateStoreName, kryoSerDe,
-                Serdes.serdeFrom(computationStageSerDes, computationStageSerDes), inMemory));
+                Serdes.serdeFrom(valueSerDe, valueSerDe), inMemory));
 
         initializeStateStores(stateStoreSuppliers);
     }
@@ -126,14 +133,14 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
         if( this.nfa == null ) {
             LOG.info("Initializing NFA for topic={}, partition={}", context.topic(), context.partition());
             KVSharedVersionedBuffer.Factory<K, V> bufferFactory = KVSharedVersionedBuffer.getFactory();
-            KeyValueStore<TopicAndPartition, Queue<ComputationStage<K, V>>> nfaStore = getNFAStore();
+            KeyValueStore<TopicAndPartition, NFAStateValue<K, V>>  nfaStore = getNFAStore();
             TopicAndPartition tp = new TopicAndPartition(context.topic(), context.partition());
-            Queue<ComputationStage<K, V>> computationStages = nfaStore.get(tp);
-
+            NFAStateValue<K, V> nfaState = nfaStore.get(tp);
             KVSharedVersionedBuffer<K, V> buffer = bufferFactory.make(context, bufferStateStoreName);
-            if (computationStages != null) {
-                LOG.info("Loading existing nfa states for {}", tp);
-                this.nfa = new NFA<>(new StateStoreProvider(queryName, context), buffer, computationStages);
+            if (nfaState != null) {
+                LOG.info("Loading existing nfa states for {}, latest offset {}", tp, nfaState.latestOffset);
+                this.nfa = new NFA<>(new StateStoreProvider(queryName, context), buffer, nfaState.runs, nfaState.computationStages);
+                this.highwatermark = nfaState.latestOffset;
             } else {
                 this.nfa = new NFA<>(new StateStoreProvider(queryName, context), buffer, stages);
             }
@@ -162,18 +169,27 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
     @Override
     public void process(K key, V value) {
         initializeIfNotAndGet(this.stages);
-        if(value != null) {
+        if(value != null && checkHighWaterMarkAndUpdate()) {
             Event<K, V> event = new Event<>(key, value, context.timestamp(), context.topic(), context.partition(), context.offset());
             List<Sequence<K, V>> sequences = this.nfa.matchPattern(event);
-            KeyValueStore<TopicAndPartition, Queue<ComputationStage<K, V>>> store = getNFAStore();
-            store.put(new TopicAndPartition(context.topic(), context.partition()), this.nfa.getComputationStages());
+            KeyValueStore<TopicAndPartition, NFAStateValue<K, V>> store = getNFAStore();
+            store.put(new TopicAndPartition(context.topic(), context.partition()), new NFAStateValue<>(this.nfa.getComputationStages(), this.nfa.getRuns(), context.offset() + 1));
             sequences.forEach(seq -> this.context.forward(null, seq));
         }
     }
 
+    private boolean checkHighWaterMarkAndUpdate() {
+        if (this.context.offset() < this.highwatermark) {
+            LOG.warn("Offset({}) is prior to the current high-water mark({})", this.context.offset(), this.highwatermark);
+            return false;
+        }
+        this.highwatermark = this.context.offset();
+        return true;
+    }
+
     @SuppressWarnings("unchecked")
-    private KeyValueStore<TopicAndPartition, Queue<ComputationStage<K, V>>> getNFAStore() {
-        return (KeyValueStore<TopicAndPartition, Queue<ComputationStage<K, V>>>)this.context.getStateStore(nfaStateStoreName);
+    private KeyValueStore<TopicAndPartition, NFAStateValue<K, V>> getNFAStore() {
+        return (KeyValueStore<TopicAndPartition, NFAStateValue<K, V>>) this.context.getStateStore(nfaStateStoreName);
     }
 
     @Override
@@ -186,7 +202,74 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
 
     }
 
-    private static class TopicAndPartition implements Comparable<TopicAndPartition>, Serializable {
+    private static class NFAStateValue<K, V> implements Comparable<NFAStateValue>, Serializable {
+        public Queue<ComputationStage<K, V>> computationStages;
+        public Long runs;
+        public Long latestOffset;
+
+        public NFAStateValue(){}
+
+        public NFAStateValue(Queue<ComputationStage<K, V>> computationStages, Long runs, Long latestOffset) {
+            this.computationStages = computationStages;
+            this.runs = runs;
+            this.latestOffset = latestOffset;
+        }
+
+        @Override
+        public int hashCode() {
+            return latestOffset.hashCode();
+        }
+
+        @Override
+        public int compareTo(NFAStateValue that) {
+            return this.latestOffset.compareTo(that.latestOffset);
+        }
+    }
+
+    private static class NFASTateValueSerDe<K, V> implements Serializer<NFAStateValue<K, V>>, Deserializer<NFAStateValue<K, V>> {
+
+        private ComputationStageSerDe<K, V> computationStageSerDes;
+
+        public NFASTateValueSerDe(ComputationStageSerDe<K, V> computationStageSerDes) {
+            this.computationStageSerDes = computationStageSerDes;
+        }
+
+        @Override
+        public NFAStateValue<K, V> deserialize(String topic, byte[] bytes) {
+            Queue<ComputationStage<K, V>> queue = computationStageSerDes.deserialize(topic, bytes);
+            ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES * 2);
+            buffer.put(Arrays.copyOfRange(bytes, bytes.length - Long.BYTES * 2, bytes.length));
+            buffer.flip();
+            long offset = buffer.getLong();
+            long runs   = buffer.getLong();
+            return new NFAStateValue<>(queue, runs, offset);
+        }
+
+        @Override
+        public byte[] serialize(String topic, NFAStateValue<K, V> data) {
+            byte[] stagesBytes = computationStageSerDes.serialize(topic, data.computationStages);
+            ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES * 2);
+            buffer.putLong(data.latestOffset);
+            buffer.putLong(data.runs);
+            byte[] offsetBytes = buffer.array();
+
+            byte[] bytes = new byte[stagesBytes.length + offsetBytes.length];
+            System.arraycopy(stagesBytes, 0, bytes, 0, stagesBytes.length);
+            System.arraycopy(offsetBytes, 0, bytes, stagesBytes.length, offsetBytes.length);
+            return bytes;
+        }
+
+        @Override
+        public void configure(Map<String, ?> map, boolean b) {
+
+        }
+        @Override
+        public void close() {
+
+        }
+    }
+
+        private static class TopicAndPartition implements Comparable<TopicAndPartition>, Serializable {
 
         public String topic;
         public int partition;

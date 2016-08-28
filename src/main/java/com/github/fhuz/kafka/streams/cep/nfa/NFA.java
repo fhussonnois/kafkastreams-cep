@@ -52,22 +52,27 @@ public class NFA<K, V> implements Serializable {
 
     private Queue<ComputationStage<K, V>> computationStages;
 
-    private AtomicLong runs = new AtomicLong(1);
+    private AtomicLong runs;
 
     /**
      * Creates a new {@link NFA} instance.
      */
     public NFA(StateStoreProvider storeProvider, KVSharedVersionedBuffer<K, V> buffer, Collection<Stage<K, V>> stages) {
-        this(storeProvider, buffer, initComputationStates(stages));
+        this(storeProvider, buffer, 1L, initComputationStates(stages));
     }
 
     /**
      * Creates a new {@link NFA} instance.
      */
-    public NFA(StateStoreProvider storeProvider, KVSharedVersionedBuffer<K, V> buffer, Queue<ComputationStage<K, V>> computationStages) {
+    public NFA(StateStoreProvider storeProvider, KVSharedVersionedBuffer<K, V> buffer, Long runs, Queue<ComputationStage<K, V>> computationStages) {
         this.storeProvider = storeProvider;
         this.sharedVersionedBuffer = buffer;
         this.computationStages = computationStages;
+        this.runs = new AtomicLong(runs);
+    }
+
+    public long getRuns() {
+        return runs.get();
     }
 
     private static <K, V> Queue<ComputationStage<K, V>> initComputationStates(Collection<Stage<K, V>> stages) {
