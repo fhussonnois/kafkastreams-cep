@@ -1,3 +1,19 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.github.fhuz.kafka.streams.cep.nfa.buffer;
 
 import com.github.fhuz.kafka.streams.cep.Sequence;
@@ -7,6 +23,10 @@ import com.github.fhuz.kafka.streams.cep.Event;
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.KVSharedVersionedBuffer;
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.StackEventKey;
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.TimedKeyValue;
+import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.TimedKeyValueSerDes;
+import com.github.fhuz.kafka.streams.cep.serde.KryoSerDe;
+import org.apache.kafka.common.serialization.Serde;
+import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.internals.MemoryLRUCache;
 import org.junit.Test;
@@ -27,7 +47,7 @@ public class SharedVersionedBufferTest {
 
     @Test
     public void testExtractPatternsWithOneRun() {
-        KVSharedVersionedBuffer<String, String> buffer = this.<String, String>getInMemorySharedBuffer();
+        KVSharedVersionedBuffer<String, String> buffer = this.getInMemorySharedBuffer(Serdes.String(), Serdes.String());
         buffer.put(first, ev1, new DeweyVersion("1"));
         buffer.put(second, ev2, first, ev1, new DeweyVersion("1.0"));
         buffer.put(latest, ev3, second, ev2, new DeweyVersion("1.0.0"));
@@ -42,7 +62,7 @@ public class SharedVersionedBufferTest {
 
     @Test
     public void testExtractPatternsWithBranchingRun() {
-        KVSharedVersionedBuffer<String, String> buffer = this.<String, String>getInMemorySharedBuffer();
+        KVSharedVersionedBuffer<String, String> buffer = this.getInMemorySharedBuffer(Serdes.String(), Serdes.String());
 
         buffer.put(first, ev1, new DeweyVersion("1"));
         buffer.put(second, ev2, first, ev1, new DeweyVersion("1.0"));
@@ -68,8 +88,10 @@ public class SharedVersionedBufferTest {
     }
 
     @SuppressWarnings("unchecked")
-    private <K, V> KVSharedVersionedBuffer<K, V> getInMemorySharedBuffer() {
-        KeyValueStore<StackEventKey, TimedKeyValue<K, V>> store = new MemoryLRUCache<>("test", 100);
+    private <K, V> KVSharedVersionedBuffer<K, V> getInMemorySharedBuffer(Serde<K> keySerDe, Serde<V> valueSerDe) {
+        TimedKeyValueSerDes<K, V> keyValueSerDes = new TimedKeyValueSerDes<>(keySerDe, valueSerDe);
+        KryoSerDe<StackEventKey> kryoSerDe = new KryoSerDe<>();
+        MemoryLRUCache<StackEventKey, TimedKeyValue<K, V>> store = new MemoryLRUCache<>("test", 100, kryoSerDe, Serdes.serdeFrom(keyValueSerDes, keyValueSerDes));
         return new KVSharedVersionedBuffer<>(store);
     }
 }

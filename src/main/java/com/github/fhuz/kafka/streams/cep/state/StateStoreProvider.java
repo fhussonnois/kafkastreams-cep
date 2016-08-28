@@ -22,11 +22,11 @@ import org.apache.kafka.streams.state.KeyValueStore;
 
 public class StateStoreProvider {
 
-    public static final String PREFIX_BUFFER_EVENT_STORE = "_cep_evt_";
+    private static final String PREFIX_BUFFER_EVENT_STORE = "cep-evt-";
 
-    public static final String PREFIX_NFA_STORE          = "_cep_nfa_";
+    private static final String PREFIX_NFA_STORE          = "cep-nfa-";
 
-    public static final String PREFIX_STATES_STORE       = "_cep_state_";
+    private static final String PREFIX_STATES_STORE       = "cep-state-";
 
     private String pattern;
 
@@ -38,7 +38,7 @@ public class StateStoreProvider {
      * @param context
      */
     public StateStoreProvider(String queryName, ProcessorContext context) {
-        this.pattern = queryName.toLowerCase().replace("\\s+", "");
+        this.pattern = queryName;
         this.context = context;
     }
 
@@ -69,6 +69,6 @@ public class StateStoreProvider {
 
     private static String makeStateName(String type, String queryName, String state) {
         String s = type + queryName;
-        return state == null ? s : s + "_" + state ;
+        return state == null ? s : s + "-" + state ;
     }
 }

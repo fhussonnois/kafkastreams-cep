@@ -1,3 +1,19 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.github.fhuz.kafka.streams.cep.nfa;
 
 import com.github.fhuz.kafka.streams.cep.Event;
@@ -5,17 +21,19 @@ import com.github.fhuz.kafka.streams.cep.Sequence;
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.KVSharedVersionedBuffer;
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.TimedKeyValue;
 import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.StackEventKey;
+import com.github.fhuz.kafka.streams.cep.nfa.buffer.impl.TimedKeyValueSerDes;
 import com.github.fhuz.kafka.streams.cep.pattern.QueryBuilder;
 import com.github.fhuz.kafka.streams.cep.pattern.StagesFactory;
 import com.github.fhuz.kafka.streams.cep.pattern.Pattern;
+import com.github.fhuz.kafka.streams.cep.serde.KryoSerDe;
 import com.github.fhuz.kafka.streams.cep.state.StateStoreProvider;
 import org.apache.kafka.common.serialization.Serde;
+import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsMetrics;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.StateRestoreCallback;
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.processor.TaskId;
-import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.internals.MemoryLRUCache;
 import org.junit.Test;
 
@@ -56,7 +74,7 @@ public class NFATest {
 
         List<Stage<String, String>> stages = new StagesFactory<String, String>().make(query);
         DummyProcessorContext context = new DummyProcessorContext();
-        NFA<String, String> nfa = new NFA<>(new StateStoreProvider("test", context), getInMemorySharedBuffer(), stages);
+        NFA<String, String> nfa = new NFA<>(new StateStoreProvider("test", context), getInMemorySharedBuffer(Serdes.String(), Serdes.String()), stages);
 
         List<Sequence<String, String>> s = simulate(nfa, context, ev1, ev2, ev3);
         assertEquals(1, s.size());
@@ -87,7 +105,7 @@ public class NFATest {
 
         List<Stage<String, String>> stages = new StagesFactory<String, String>().make(query);
         DummyProcessorContext context = new DummyProcessorContext();
-        NFA<String, String> nfa = new NFA<>(new StateStoreProvider("test", context), getInMemorySharedBuffer(), stages);
+        NFA<String, String> nfa = new NFA<>(new StateStoreProvider("test", context), getInMemorySharedBuffer(Serdes.String(), Serdes.String()), stages);
 
         List<Sequence<String, String>> s = simulate(nfa, context, ev1, ev2, ev3, ev4, ev5);
         assertEquals(1, s.size());
@@ -121,7 +139,7 @@ public class NFATest {
 
         List<Stage<String, String>> stages = new StagesFactory<String, String>().make(pattern);
         DummyProcessorContext context = new DummyProcessorContext();
-        NFA<String, String> nfa = new NFA<>(new StateStoreProvider("test", context), getInMemorySharedBuffer(), stages);
+        NFA<String, String> nfa = new NFA<>(new StateStoreProvider("test", context), getInMemorySharedBuffer(Serdes.String(), Serdes.String()), stages);
 
         List<Sequence<String, String>> s = simulate(nfa, context, ev1, ev2, ev3, ev4, ev5);
         assertEquals(1, s.size());
@@ -154,7 +172,7 @@ public class NFATest {
 
         List<Stage<String, String>> stages = new StagesFactory<String, String>().make(pattern);
         DummyProcessorContext context = new DummyProcessorContext();
-        NFA<String, String> nfa = new NFA<>(new StateStoreProvider("test", context), getInMemorySharedBuffer(), stages);
+        NFA<String, String> nfa = new NFA<>(new StateStoreProvider("test", context), getInMemorySharedBuffer(Serdes.String(), Serdes.String()), stages);
 
         List<Sequence<String, String>> s = simulate(nfa, context, ev1, ev2, ev3, ev4, ev5);
         assertEquals(2, s.size());
@@ -183,11 +201,16 @@ public class NFATest {
         return s;
     }
 
+    @SuppressWarnings("unchecked")
+    private <K, V> KVSharedVersionedBuffer<K, V> getInMemorySharedBuffer(Serde<K> keySerDe, Serde<V> valueSerDe) {
+        return new KVSharedVersionedBuffer<>(newMemoryLRUCache("test", keySerDe, valueSerDe));
+    }
 
     @SuppressWarnings("unchecked")
-    private <K, V> KVSharedVersionedBuffer<K, V> getInMemorySharedBuffer() {
-        KeyValueStore<StackEventKey, TimedKeyValue<K, V>> store = new MemoryLRUCache<>("test", 100);
-        return new KVSharedVersionedBuffer<>(store);
+    private <K, V>  MemoryLRUCache<StackEventKey, TimedKeyValue<K, V>> newMemoryLRUCache(String name, Serde<K> keySerDe, Serde<V> valueSerDe) {
+        TimedKeyValueSerDes<K, V> keyValueSerDes = new TimedKeyValueSerDes<>(keySerDe, valueSerDe);
+        KryoSerDe<StackEventKey> kryoSerDe = new KryoSerDe<>();
+        return new MemoryLRUCache<>(name, 100, kryoSerDe, Serdes.serdeFrom(keyValueSerDes, keyValueSerDes));
     }
 
     /**
@@ -234,9 +257,10 @@ public class NFATest {
 
         List<Stage<Object, StockEvent>> stages = new StagesFactory<Object, StockEvent>().make(pattern);
         DummyProcessorContext context = new DummyProcessorContext();
-        context.register(new MemoryLRUCache<>(StateStoreProvider.getStateStoreName(PATTERN_TEST, "avg" ), 100), false, null);
-        context.register(new MemoryLRUCache<>(StateStoreProvider.getStateStoreName(PATTERN_TEST, "volume" ), 100), false, null);
-        NFA<Object, StockEvent> nfa = new NFA<>(new StateStoreProvider(PATTERN_TEST, context), getInMemorySharedBuffer(), stages);
+        context.register(newMemoryLRUCache(StateStoreProvider.getStateStoreName(PATTERN_TEST, "avg" ), Serdes.Long(), Serdes.Long()), false, null);
+        context.register(newMemoryLRUCache(StateStoreProvider.getStateStoreName(PATTERN_TEST, "volume"), Serdes.Long(), Serdes.Long()), false, null);
+        KVSharedVersionedBuffer<Object, StockEvent> inMemorySharedBuffer = getInMemorySharedBuffer(new KryoSerDe<>(), new KryoSerDe<>());
+        NFA<Object, StockEvent> nfa = new NFA<>(new StateStoreProvider(PATTERN_TEST, context), inMemorySharedBuffer, stages);
 
         AtomicLong offset = new AtomicLong(0);
         List<Event<Object, StockEvent>> collect = Arrays.asList(new StockEvent[]{e1, e2, e3, e4, e5, e6, e7, e8})

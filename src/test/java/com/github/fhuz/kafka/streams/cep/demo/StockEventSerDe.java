@@ -74,6 +74,7 @@ public class StockEventSerDe implements Serde<StockEvent> {
 
         @Override
         public byte[] serialize(String topic, StockEvent data) {
+            if( data == null ) return null;
             JSONObject json = new JSONObject();
             json.put("name", data.name);
             json.put("price", data.price);

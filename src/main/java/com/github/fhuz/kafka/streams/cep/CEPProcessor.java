@@ -85,10 +85,10 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
         StagesFactory<K, V> fact = new StagesFactory<>();
         this.stages = fact.make(pattern);
         this.inMemory = inMemory;
-        this.queryName = queryName;
+        this.queryName = queryName.toLowerCase().replace("\\s+", "");
 
-        this.bufferStateStoreName = StateStoreProvider.getEventBufferStoreName(queryName);
-        this.nfaStateStoreName    = StateStoreProvider.getNFAStoreName(queryName);
+        this.bufferStateStoreName = StateStoreProvider.getEventBufferStoreName(this.queryName);
+        this.nfaStateStoreName    = StateStoreProvider.getNFAStoreName(this.queryName);
     }
 
     @Override
@@ -145,7 +145,7 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
         for (StateStoreSupplier stateStoreSupplier : suppliers) {
             StateStore store = stateStoreSupplier.get();
             store.init(this.context, store);
-            LOG.info("State store registered with queryName {}", store.name());
+            LOG.info("State store registered with name {}", store.name());
         }
     }
 

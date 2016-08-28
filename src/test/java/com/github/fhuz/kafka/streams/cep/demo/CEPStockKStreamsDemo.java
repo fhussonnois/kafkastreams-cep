@@ -1,6 +1,22 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.github.fhuz.kafka.streams.cep.demo;
 
-import com.github.fhuz.kafka.streams.cep.CEPProcessor;
+import com.github.fhuz.kafka.streams.cep.CEPStream;
 import com.github.fhuz.kafka.streams.cep.Sequence;
 import com.github.fhuz.kafka.streams.cep.pattern.Pattern;
 import com.github.fhuz.kafka.streams.cep.pattern.QueryBuilder;
@@ -8,9 +24,8 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsConfig;
-import org.apache.kafka.streams.processor.Processor;
-import org.apache.kafka.streams.processor.ProcessorContext;
-import org.apache.kafka.streams.processor.TopologyBuilder;
+import org.apache.kafka.streams.kstream.KStream;
+import org.apache.kafka.streams.kstream.KStreamBuilder;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
@@ -34,6 +49,7 @@ public class CEPStockKStreamsDemo {
         // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
+        // build query
         final Pattern<Object, StockEvent> pattern = new QueryBuilder<Object, StockEvent>()
                 .select()
                     .where((k, v, ts, store) -> v.volume > 1000)
@@ -52,52 +68,30 @@ public class CEPStockKStreamsDemo {
                     .within(1, TimeUnit.HOURS)
                 .build();
 
-        TopologyBuilder topologyBuilder = new TopologyBuilder();
-        topologyBuilder.addSource("events", "StockEvents")
-                .addProcessor("cep", () -> new CEPProcessor<>("Stocks", pattern), "events")
-                .addProcessor("matches", () -> new AbstractProcessor<Object,  Sequence<Object, StockEvent>>() {
-                    @Override
-                    public void doProcess(ProcessorContext context, Object key, Sequence<Object, StockEvent> sequence) {
-                        JSONObject json = new JSONObject();
-                        sequence.asMap().forEach( (k, v) -> {
-                            JSONArray events = new JSONArray();
-                            json.put(k, events);
-                            List<String> collect = v.stream().map(e -> e.value.name).collect(Collectors.toList());
-                            Collections.reverse(collect);
-                            collect.forEach(e -> events.add(e));
-                        });
-                        context.forward(null, json.toJSONString());
-                    }
-                }, "cep")
-                .addSink("sink", "matches", Serdes.String().serializer(),Serdes.String().serializer(), "matches");
+        KStreamBuilder builder = new KStreamBuilder();
+
+        CEPStream<Object, StockEvent> stream = new CEPStream<>(builder.stream("StockEvents"));
+
+        KStream<Object, Sequence<Object, StockEvent>> stocks = stream.query("Stocks", pattern);
+
+        stocks.mapValues(seq -> {
+                  JSONObject json = new JSONObject();
+                  seq.asMap().forEach( (k, v) -> {
+                      JSONArray events = new JSONArray();
+                      json.put(k, events);
+                      List<String> collect = v.stream().map(e -> e.value.name).collect(Collectors.toList());
+                      Collections.reverse(collect);
+                      collect.forEach(e -> events.add(e));
+                  });
+                  return json.toJSONString();
+              })
+              .through(null, Serdes.String(), "Matches")
+              .print();
+
 
         //Use the topologyBuilder and streamingConfig to start the kafka streams process
-        KafkaStreams streaming = new KafkaStreams(topologyBuilder, props);
+        KafkaStreams streaming = new KafkaStreams(builder, props);
+        streaming.cleanUp();
         streaming.start();
-    }
-
-    static abstract class AbstractProcessor<K, V> implements Processor<K, V> {
-        private ProcessorContext context;
-        @Override
-        public void init(ProcessorContext context) {
-            this.context = context;
-        }
-
-        @Override
-        public void process(K key, V value) {
-            doProcess(context, key, value);
-        }
-
-        public abstract void doProcess(ProcessorContext context, K key, V value);
-
-        @Override
-        public void punctuate(long timestamp) {
-
-        }
-
-        @Override
-        public void close() {
-
-        }
     }
 }

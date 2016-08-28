@@ -4,9 +4,6 @@ Complex Event Processing on top of Kafka Streams Processor API !
 
 [Apache Kafka](http://kafka.apache.org/) is a high-throughput, distributed, publish-subscribe messaging system.
 
-This repository is not stable - This library is still in progress (use at your own risk)
-
-
 ## Demonstration
 
 The below example is based on the research paper **Efficient Pattern Matching over Event Streams**.
@@ -27,8 +24,8 @@ Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-si
            b.volume < 80%*a[a.LEN].volume }
        WITHIN 1 hour
 ```
-### KafkaStreams implementation:
 
+### Build Query
 ```java
         Pattern<Object, StockEvent> pattern = new QueryBuilder<Object, StockEvent>()
                 .select()
@@ -47,13 +44,34 @@ Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-si
                     .where((k, v, ts, state) -> v.volume < (0.8 *  (int)state.get("volume")))
                     .within(1, TimeUnit.HOURS)
                 .build();
+```
 
-        TopologyBuilder topologyBuilder = new TopologyBuilder();
-        topologyBuilder.addSource("source", "StockEvents")
-                .addProcessor("cep", () -> new CEPProcessor<>(query), "source");
+### KStreams API:
+```java
+        Pattern<Object, StockEvent> pattern = ...
+
+        KStreamBuilder builder = new KStreamBuilder();
+
+        CEPStream<Object, StockEvent> stream = new CEPStream<>(builder.stream("StockEvents"));
+
+        KStream<Object, Sequence<Object, StockEvent>> stocks = stream.query("Stocks", pattern);
+        ...
 
         //Use the topologyBuilder and streamingConfig to start the kafka streams process
-        KafkaStreams streaming = new KafkaStreams(topologyBuilder, props);
+        KafkaStreams streaming = new KafkaStreams(builder, props);
+```
+
+### Processor API:
+```java
+        Pattern<Object, StockEvent> pattern = ...
+
+        TopologyBuilder builder = new TopologyBuilder();
+        topologyBuilder.addSource("source", "StockEvents")
+                .addProcessor("cep", () -> new CEPProcessor<>(query), "source");
+        ...
+        
+        //Use the topologyBuilder and streamingConfig to start the kafka streams process
+        KafkaStreams streaming = new KafkaStreams(builder, props);
         streaming.start();
 ```
 
@@ -85,7 +103,7 @@ Run the demonstration class **CEPStockKStreamsDemo** :
 - Consume from the sink topic **"matches"**
 
 ```bash
-./bin/kafka-console-consumer --new-consumer --topic matches --bootstrap-server localhost:9092
+./bin/kafka-console-consumer --new-consumer --topic Matches --bootstrap-server localhost:9092
 ```
 - Output
 
@@ -106,6 +124,9 @@ Run the demonstration class **CEPStockKStreamsDemo** :
  * Improve test scenarios
  * NFA is not currently tolerant to at-least once semantic (keep a high water mark)
  * Add support for streams grouped by key
+
+###Contributions
+Any contribution is welcome
 
 ###Licence
 Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements. See the NOTICE file distributed with this work for additional information regarding copyright ownership. The ASF licenses this file to you under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
