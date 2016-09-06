@@ -10,8 +10,8 @@
         <version>9</version>
     </parent>
     
-    <groupId>com.github.fhuss.kafka.streams</groupId>
-    <artifactId>streams-cep</artifactId>
+    <groupId>com.github.fhuss</groupId>
+    <artifactId>kafka-streams-cep</artifactId>
     <version>0.1.0</version>
 
     <build>

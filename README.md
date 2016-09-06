@@ -16,6 +16,15 @@ Currently, this library supports the following event selection strategies :
 
  * `Skip till any match` : Irrelevant events are skipped until an event matching the next pattern is encountered. All events in the stream that can match a pattern are selected.
  
+### Maven dependency
+```xml
+    <dependency>
+      <groupId>com.github.fhuss</groupId>
+      <artifactId>kafka-streams-cep</artifactId>
+      <version>0.1.0</version>
+    </dependency>
+```
+ 
 ## Demonstration
 
 The below example is based on the research paper **Efficient Pattern Matching over Event Streams**.
