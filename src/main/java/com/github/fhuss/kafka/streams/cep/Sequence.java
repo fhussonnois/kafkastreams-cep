@@ -68,8 +68,7 @@ public class Sequence<K, V> {
     public long size() {
         return sequence.values()
                 .stream()
-                .flatMap(List::stream)
-                .count();
+                .mapToInt(List::size).sum();
     }
 
     @Override
