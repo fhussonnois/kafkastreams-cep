@@ -4,9 +4,16 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.github.fhuz.kafka.streams</groupId>
+    <parent>
+        <groupId>org.sonatype.oss</groupId>
+        <artifactId>oss-parent</artifactId>
+        <version>9</version>
+    </parent>
+    
+    <groupId>com.github.fhuss.kafka.streams</groupId>
     <artifactId>streams-cep</artifactId>
-    <version>0.1</version>
+    <version>0.1.0</version>
+
     <build>
         <plugins>
             <plugin>
@@ -38,6 +45,12 @@
             </roles>
         </developer>
     </developers>
+
+    <scm>
+        <connection>scm:git:git@github.com:fhussonnois/kafkastreams-cep.git</connection>
+        <developerConnection>scm:git:git@github.com:fhussonnois/kafkastreams-cep.git</developerConnection>
+        <url>git@github.com:fhussonnois/kafkastreams-cep.git</url>
+    </scm>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
