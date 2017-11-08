@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 package com.github.fhuss.kafka.streams.cep.state;
-
 
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.state.KeyValueStore;
@@ -69,6 +68,6 @@ public class StateStoreProvider {
 
     private static String makeStateName(String type, String queryName, String state) {
         String s = type + queryName;
-        return state == null ? s : s + "-" + state ;
+        return (state == null ? s : s + "-" + state).toLowerCase();
     }
 }

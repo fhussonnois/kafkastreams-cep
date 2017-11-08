@@ -17,6 +17,11 @@ Currently, this library supports the following event selection strategies :
  * `Skip till any match` : Irrelevant events are skipped until an event matching the next pattern is encountered. All events in the stream that can match a pattern are selected.
  
 ### Maven dependency
+
+For Apache Kafka 0.10.0.1
+
+Available in [Maven Central](https://search.maven.org/#artifactdetails%7Ccom.github.fhuss%7Ckafka-streams-cep%7C0.1.0%7Cjar)
+
 ```xml
     <dependency>
       <groupId>com.github.fhuss</groupId>
@@ -24,7 +29,16 @@ Currently, this library supports the following event selection strategies :
       <version>0.1.0</version>
     </dependency>
 ```
- 
+
+As of Apache Kafka 1.0.0
+
+```xml
+    <dependency>
+      <groupId>com.github.fhuss</groupId>
+      <artifactId>kafka-streams-cep</artifactId>
+      <version>0.2.0-SNAPSHOT</version>
+    </dependency>
+```     
 ## Demonstration
 
 The below example is based on the research paper **Efficient Pattern Matching over Event Streams**.
@@ -48,7 +62,7 @@ Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-si
 
 ### Build Query
 ```java
-        Pattern<Object, StockEvent> pattern = new QueryBuilder<Object, StockEvent>()
+        Pattern<String, StockEvent> pattern = new QueryBuilder<String, StockEvent>()
                 .select()
                     .where((k, v, ts, store) -> v.volume > 1000)
                     .<Integer>fold("avg", (k, v, curr) -> v.price)
@@ -71,29 +85,30 @@ Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-si
 ```java
         Pattern<Object, StockEvent> pattern = ...
 
-        KStreamBuilder builder = new KStreamBuilder();
+        ComplexStreamsBuilder builder = new ComplexStreamsBuilder();
 
-        CEPStream<Object, StockEvent> stream = new CEPStream<>(builder.stream("StockEvents"));
-
-        KStream<Object, Sequence<Object, StockEvent>> stocks = stream.query("Stocks", pattern);
-        ...
-
-        //Use the topologyBuilder and streamingConfig to start the kafka streams process
-        KafkaStreams streaming = new KafkaStreams(builder, props);
+        CEPStream<String, StockEvent> stream = builder.stream("StockEvents");
+        KStream<String, Sequence<String, StockEvent>> stocks = stream.query("Stocks", pattern, Serdes.String(), new StockEventSerDe());
+        
+        KafkaStreams streams = new KafkaStreams(builder.build(), props);
 ```
 
 ### Processor API:
 ```java
         Pattern<Object, StockEvent> pattern = ...
 
-        TopologyBuilder builder = new TopologyBuilder();
-        topologyBuilder.addSource("source", "StockEvents")
-                .addProcessor("cep", () -> new CEPProcessor<>(query), "source");
-        ...
+        final String queryName = "Stocks";
+
+        Topology topology = new Topology()
+                .addSource("source", "StockEvents")
+                .addProcessor("cep", () -> new CEPProcessor<>(queryName, pattern), "source")
+                .addSink("sink", "Matches", "cep");
+
+        // utility class to register all stores associated with the pattern.
+        CEPStoreBuilders<String, StockEvent> builders = new CEPStoreBuilders<>();
+        builders.addStateStores(topology, "cep", queryName, pattern, Serdes.String(), new StockEventSerDe());
         
-        //Use the topologyBuilder and streamingConfig to start the kafka streams process
-        KafkaStreams streaming = new KafkaStreams(builder, props);
-        streaming.start();
+        KafkaStreams streams = new KafkaStreams(topology, props);
 ```
 
 ## Demo
