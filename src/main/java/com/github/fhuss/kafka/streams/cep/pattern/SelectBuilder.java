@@ -20,9 +20,10 @@ public class SelectBuilder<K, V> {
 
     private final Pattern<K, V> pattern;
 
-    public SelectBuilder(Pattern<K, V> pattern) {
+    public SelectBuilder(final Pattern<K, V> pattern) {
         this.pattern = pattern;
     }
+
     public SelectBuilder<K, V> optional() {
         pattern.setCardinality(Pattern.Cardinality.OPTIONAL);
         return this;
@@ -53,7 +54,7 @@ public class SelectBuilder<K, V> {
         return this;
     }
 
-    public PredicateBuilder<K, V> where(Matcher<K, V> predicate) {
+    public PredicateBuilder<K, V> where(final Matcher<K, V> predicate) {
         this.pattern.addPredicate(predicate);
         return new PredicateBuilder<>(this.pattern);
     }

@@ -22,7 +22,7 @@ public class StateAggregator<K, V, T> {
     private final String name;
     private final Aggregator<K, V, T> aggregate;
 
-    public StateAggregator(String name, Aggregator<K, V, T> aggregate) {
+    public StateAggregator(final String name, final Aggregator<K, V, T> aggregate) {
         this.name = name;
         this.aggregate = aggregate;
     }

@@ -37,7 +37,9 @@ public class ComputationStageSerDe<K, V>  extends AbstractKryoSerde<Queue<Comput
     /**
      * Creates a new {@link ComputationStageSerDe} instance.
      */
-    public ComputationStageSerDe(List<Stage<K, V>> stages, Serde<K> keys, Serde<V> values) {
+    public ComputationStageSerDe(final List<Stage<K, V>> stages,
+                                 final Serde<K> keys,
+                                 final Serde<V> values) {
         super(keys, values);
         this.stagesKeyedByNames = new HashMap<>();
         for(Stage<K, V> stage : stages) {

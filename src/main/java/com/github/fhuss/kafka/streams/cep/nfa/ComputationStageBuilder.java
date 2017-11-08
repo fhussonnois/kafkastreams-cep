@@ -18,7 +18,14 @@ package com.github.fhuss.kafka.streams.cep.nfa;
 
 import com.github.fhuss.kafka.streams.cep.Event;
 
+/**
+ * Class to build a new {@link ComputationStage} instance.
+ *
+ * @param <K>   the record key type
+ * @param <V>   the record value type.
+ */
 class ComputationStageBuilder<K, V> {
+
     private Stage<K, V> stage;
     private DeweyVersion version;
     private long sequence;
@@ -26,32 +33,32 @@ class ComputationStageBuilder<K, V> {
     private long timestamp          = -1;
     private boolean isBranching     = false;
 
-    public ComputationStageBuilder<K, V> setStage(Stage<K, V> stage) {
+    public ComputationStageBuilder<K, V> setStage(final Stage<K, V> stage) {
         this.stage = stage;
         return this;
     }
 
-    public ComputationStageBuilder<K, V> setVersion(DeweyVersion version) {
+    public ComputationStageBuilder<K, V> setVersion(final DeweyVersion version) {
         this.version = version;
         return this;
     }
 
-    public ComputationStageBuilder<K, V> setSequence(long sequence) {
+    public ComputationStageBuilder<K, V> setSequence(final long sequence) {
         this.sequence = sequence;
         return this;
     }
 
-    public ComputationStageBuilder<K, V> setEvent(Event<K, V> event) {
+    public ComputationStageBuilder<K, V> setEvent(final Event<K, V> event) {
         this.event = event;
         return this;
     }
 
-    public ComputationStageBuilder<K, V> setTimestamp(long timestamp) {
+    public ComputationStageBuilder<K, V> setTimestamp(final long timestamp) {
         this.timestamp = timestamp;
         return this;
     }
 
-    public ComputationStageBuilder<K, V> setBranching(boolean isBranching) {
+    public ComputationStageBuilder<K, V> setBranching(final boolean isBranching) {
         this.isBranching = isBranching;
         return this;
     }

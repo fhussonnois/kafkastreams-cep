@@ -24,6 +24,8 @@ import java.util.stream.Collectors;
  */
 public class DeweyVersion {
 
+    private static final String VERSION_RUN_SEP = "\\.";
+
     private int[] versions;
 
     public DeweyVersion() {}
@@ -31,14 +33,19 @@ public class DeweyVersion {
     /**
      * Creates a new {@link DeweyVersion} instance.
      *
-     * @param run the first version number.
+     * @param run    the first version number.
      */
-    public DeweyVersion(int run) {
+    public DeweyVersion(final int run) {
         this(new int[]{run});
     }
 
-    public DeweyVersion(String s) {
-        String[] integers = s.split("\\.");
+    /**
+     * Creates a new {@link DeweyVersion} from the specified string.
+     *
+     * @param version A string dewey version number.
+     */
+    public DeweyVersion(final String version) {
+        String[] integers = version.split(VERSION_RUN_SEP);
         this.versions = new int[integers.length];
         for(int i = 0; i < integers.length; i++)
             this.versions[i] = Integer.parseInt(integers[i]);

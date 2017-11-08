@@ -38,10 +38,10 @@ public class StagesFactory<K, V> {
      * @param pattern the pattern to make.
      * @return a new {@link NFA} instance.
      */
-    public List<Stage<K, V>> make(Pattern<K, V> pattern) {
+    public List<Stage<K, V>> make(final Pattern<K, V> pattern) {
         if( pattern == null) throw new NullPointerException("Cannot make null pattern");
 
-        List<Stage<K, V>> sequence = new ArrayList<>();
+        final List<Stage<K, V>> sequence = new ArrayList<>();
 
         Stage<K, V> successorStage = new Stage<>("$final", Stage.StateType.FINAL);
         sequence.add(successorStage);
@@ -64,12 +64,12 @@ public class StagesFactory<K, V> {
 
     private Stage<K, V> buildStage(Stage.StateType type, Pattern<K, V> currentPattern, Stage<K, V> successorStage, Pattern<K, V> successorPattern) {
 
-        Pattern.Cardinality cardinality = currentPattern.getCardinality();
+        final Pattern.Cardinality cardinality = currentPattern.getCardinality();
         Stage.StateType currentType = type;
 
-        boolean hasMandatoryState = cardinality.equals(Pattern.Cardinality.ONE_OR_MORE);
+        final boolean hasMandatoryState = cardinality.equals(Pattern.Cardinality.ONE_OR_MORE);
 
-        if(hasMandatoryState) currentType = Stage.StateType.NORMAL;
+        if (hasMandatoryState) currentType = Stage.StateType.NORMAL;
 
         Stage<K, V> stage = new Stage<>(currentPattern.getName(),currentType);
         long windowLengthMs = getWindowLengthMs(currentPattern, successorPattern);
@@ -80,11 +80,11 @@ public class StagesFactory<K, V> {
         EdgeOperation operation = cardinality.equals(Pattern.Cardinality.ONE) ? EdgeOperation.BEGIN : EdgeOperation.TAKE;
         stage.addEdge(new Stage.Edge<>(operation, predicate, successorStage));
 
-        Pattern.SelectStrategy currentPatternStrategy = currentPattern.getStrategy();
+        final Pattern.SelectStrategy currentPatternStrategy = currentPattern.getStrategy();
 
         Matcher<K, V> ignore = null;
         // ignore = true
-        if( currentPatternStrategy.equals(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH) ) {
+        if (currentPatternStrategy.equals(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH) ) {
             ignore = (key, value, ts, store) -> true;
             stage.addEdge(new Stage.Edge<>(EdgeOperation.IGNORE, ignore, null));
         }
@@ -95,7 +95,7 @@ public class StagesFactory<K, V> {
             stage.addEdge(new Stage.Edge<>(EdgeOperation.IGNORE, ignore, null));
         }
 
-        if( operation.equals(EdgeOperation.TAKE) ) {
+        if (operation.equals(EdgeOperation.TAKE) ) {
             // proceed = successor_begin || (!take && !ignore)
             boolean isStrict = currentPatternStrategy.equals(Pattern.SelectStrategy.STRICT_CONTIGUITY);
             Matcher<K, V> proceed =
@@ -107,7 +107,7 @@ public class StagesFactory<K, V> {
         }
 
         // we need to introduce a required state
-        if(hasMandatoryState) {
+        if (hasMandatoryState) {
             successorStage = stage;
             stage = new Stage<>(currentPattern.getName(), type);
             stage.addEdge(new Stage.Edge<>(EdgeOperation.BEGIN,  currentPattern.getPredicate(), successorStage));

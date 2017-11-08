@@ -30,11 +30,14 @@ import com.github.fhuss.kafka.streams.cep.state.StateStoreProvider;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsMetrics;
+import org.apache.kafka.streams.processor.Cancellable;
 import org.apache.kafka.streams.processor.ProcessorContext;
+import org.apache.kafka.streams.processor.PunctuationType;
+import org.apache.kafka.streams.processor.Punctuator;
 import org.apache.kafka.streams.processor.StateRestoreCallback;
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.processor.TaskId;
-import org.apache.kafka.streams.state.internals.MemoryLRUCache;
+import org.apache.kafka.streams.state.internals.InMemoryKeyValueStore;
 import org.junit.Test;
 
 import java.io.File;
@@ -203,14 +206,17 @@ public class NFATest {
 
     @SuppressWarnings("unchecked")
     private <K, V> KVSharedVersionedBuffer<K, V> getInMemorySharedBuffer(Serde<K> keySerDe, Serde<V> valueSerDe) {
-        return new KVSharedVersionedBuffer<>(newMemoryLRUCache("test", keySerDe, valueSerDe));
+        return new KVSharedVersionedBuffer<>(newMemoryKeyValueStore("test", keySerDe, valueSerDe));
     }
 
     @SuppressWarnings("unchecked")
-    private <K, V>  MemoryLRUCache<StackEventKey, TimedKeyValue<K, V>> newMemoryLRUCache(String name, Serde<K> keySerDe, Serde<V> valueSerDe) {
-        TimedKeyValueSerDes<K, V> keyValueSerDes = new TimedKeyValueSerDes<>(keySerDe, valueSerDe);
+    private <K, V> InMemoryKeyValueStore<StackEventKey, TimedKeyValue<K, V>> newMemoryKeyValueStore(
+            final String name,
+            final Serde<K> keySerDe,
+            final Serde<V> valueSerDe) {
+        TimedKeyValueSerDes<K, V> timedKeyValueSerDes = new TimedKeyValueSerDes<>(keySerDe, valueSerDe);
         KryoSerDe<StackEventKey> kryoSerDe = new KryoSerDe<>();
-        return new MemoryLRUCache<>(name, 100, kryoSerDe, Serdes.serdeFrom(keyValueSerDes, keyValueSerDes));
+        return new InMemoryKeyValueStore<>(name, kryoSerDe, Serdes.serdeFrom(timedKeyValueSerDes, timedKeyValueSerDes));
     }
 
     /**
@@ -257,8 +263,8 @@ public class NFATest {
 
         List<Stage<Object, StockEvent>> stages = new StagesFactory<Object, StockEvent>().make(pattern);
         DummyProcessorContext context = new DummyProcessorContext();
-        context.register(newMemoryLRUCache(StateStoreProvider.getStateStoreName(PATTERN_TEST, "avg" ), Serdes.Long(), Serdes.Long()), false, null);
-        context.register(newMemoryLRUCache(StateStoreProvider.getStateStoreName(PATTERN_TEST, "volume"), Serdes.Long(), Serdes.Long()), false, null);
+        context.register(newMemoryKeyValueStore(StateStoreProvider.getStateStoreName(PATTERN_TEST, "avg" ), Serdes.Long(), Serdes.Long()), false, null);
+        context.register(newMemoryKeyValueStore(StateStoreProvider.getStateStoreName(PATTERN_TEST, "volume"), Serdes.Long(), Serdes.Long()), false, null);
         KVSharedVersionedBuffer<Object, StockEvent> inMemorySharedBuffer = getInMemorySharedBuffer(new KryoSerDe<>(), new KryoSerDe<>());
         NFA<Object, StockEvent> nfa = new NFA<>(new StateStoreProvider(PATTERN_TEST, context), inMemorySharedBuffer, stages);
 
@@ -344,6 +350,11 @@ public class NFATest {
         }
 
         @Override
+        public Cancellable schedule(long interval, PunctuationType type, Punctuator callback) {
+            return null;
+        }
+
+        @Override
         public void schedule(long interval) {
 
         }
@@ -386,6 +397,16 @@ public class NFATest {
         @Override
         public long timestamp() {
             return System.currentTimeMillis();
+        }
+
+        @Override
+        public Map<String, Object> appConfigs() {
+            return null;
+        }
+
+        @Override
+        public Map<String, Object> appConfigsWithPrefix(String prefix) {
+            return null;
         }
     }
 

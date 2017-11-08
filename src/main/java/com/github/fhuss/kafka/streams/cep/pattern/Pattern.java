@@ -83,14 +83,14 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
     /**
      * Creates a new {@link Pattern} instance.
      **/
-    Pattern(String name) {
+    Pattern(final String name) {
         this(0, name);
     }
 
     /**
      * Creates a new {@link Pattern} instance.
      **/
-    Pattern(int level, String name) {
+    Pattern(final int level, final String name) {
         this(level, name, null);
     }
 
@@ -99,17 +99,18 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
      *
      * @param ancestor the ancestor event pattern.
      */
-    Pattern(Pattern<K, V> ancestor) {
+    Pattern(final Pattern<K, V> ancestor) {
         this(ancestor.level + 1, null, ancestor);
     }
 
     /**
      * Creates a new {@link Pattern} instance.
      *
+     * @param level    the level of this Pattern.
      * @param name     the name of the event.
      * @param ancestor the ancestor event pattern.
      */
-    private Pattern(int level, String name, Pattern<K, V> ancestor) {
+    private Pattern(final int level, final String name, final Pattern<K, V> ancestor) {
         this.level     = level;
         this.name      = name;
         this.ancestor  = ancestor;

@@ -37,33 +37,28 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
     private StateType type;
     private long windowMs = -1;
     private List<StateAggregator<K, V, Object>> aggregates;
+    private List<Edge<K, V>> edges;
 
-
-    static <K, V> Stage<K, V> newEpsilonState(Stage<K, V> current, Stage<K, V> target) {
-        Stage<K, V> newStage = new Stage<>(current.getName(), current.getType());
-        newStage.addEdge(new Stage.Edge<>(EdgeOperation.PROCEED, (k, v, t, s) -> true, target));
-        return newStage;
-    }
 
     /**
      * Dummy constructor required by Kryo.
      */
     public Stage() {}
 
-    private List<Edge<K, V>> edges;
 
     /**
      * Creates a new {@link Stage} instance.
-     * @param name
-     * @param type
+     *
+     * @param name  the name of the state.
+     * @param type  the type of the state.
      */
-    public Stage(String name, StateType type) {
+    public Stage(final String name, final StateType type) {
         this.name = name;
         this.type = type;
         this.edges = new ArrayList<>();
     }
 
-    public void setAggregates(List<StateAggregator<K, V, Object>> aggregator) {
+    public void setAggregates(final List<StateAggregator<K, V, Object>> aggregator) {
         this.aggregates = aggregator;
     }
 
@@ -83,12 +78,12 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
         return this.windowMs;
     }
 
-    public Stage<K, V> setWindow(long windowMs) {
+    public Stage<K, V> setWindow(final long windowMs) {
         this.windowMs = windowMs;
         return this;
     }
 
-    public Stage<K, V> addEdge(Edge<K, V> edge) {
+    public Stage<K, V> addEdge(final Edge<K, V> edge) {
         this.edges.add(edge);
         return this;
     }
@@ -144,6 +139,7 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
     }
 
     public static class Edge<K, V> implements Serializable {
+
         private EdgeOperation operation;
         private Matcher<K, V> predicate;
         private Stage<K, V> target;
@@ -155,7 +151,7 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
          * @param predicate the predicate to apply.
          * @param target the state to move forward if predicate is true.
          */
-        public Edge(EdgeOperation operation, Matcher<K, V> predicate, Stage<K, V> target) {
+        public Edge(final EdgeOperation operation, final Matcher<K, V> predicate, final Stage<K, V> target) {
             if( predicate == null ) throw new IllegalArgumentException("predicate cannot be null");
             if( operation == null ) throw new IllegalArgumentException("operation cannot be null");
             this.operation = operation;
@@ -202,5 +198,11 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
 
     public enum StateType {
         BEGIN, NORMAL, FINAL;
+    }
+
+    static <K, V> Stage<K, V> newEpsilonState(Stage<K, V> current, Stage<K, V> target) {
+        Stage<K, V> newStage = new Stage<>(current.getName(), current.getType());
+        newStage.addEdge(new Stage.Edge<>(EdgeOperation.PROCEED, (k, v, t, s) -> true, target));
+        return newStage;
     }
 }

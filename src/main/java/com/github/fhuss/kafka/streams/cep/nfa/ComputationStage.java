@@ -43,28 +43,30 @@ public class ComputationStage<K, V> {
     /**
      * The version number.
      */
-    private DeweyVersion version;
+    private final DeweyVersion version;
 
-    private long sequence;
+    private final long sequence;
 
     /**
      * Flag to indicate this computation stage is the first of a new branch.
      */
-    private boolean isBranching = false;
+    private final boolean isBranching;
 
-    ComputationStage(Stage<K, V> stage, DeweyVersion version, long sequence) {
-        this(stage, version, null, -1, sequence);
-    }
-
-    ComputationStage(Stage<K, V> stage, DeweyVersion version, Event<K, V> event, long timestamp, long sequence) {
-        this.stage = stage;
-        this.event = event;
-        this.timestamp = timestamp;
-        this.version = version;
-        this.sequence = sequence;
-    }
-
-    ComputationStage(Stage<K, V> stage, DeweyVersion version, Event<K, V> event, long timestamp, long sequence, boolean isBranching) {
+    /**
+     * Creates a new {@link ComputationStage} instance.
+     * @param stage
+     * @param version
+     * @param event
+     * @param timestamp
+     * @param sequence
+     * @param isBranching
+     */
+    ComputationStage(final Stage<K, V> stage,
+                     final DeweyVersion version,
+                     final Event<K, V> event,
+                     final long timestamp,
+                     final long sequence,
+                     final boolean isBranching) {
         this.stage = stage;
         this.event = event;
         this.timestamp = timestamp;
@@ -73,7 +75,12 @@ public class ComputationStage<K, V> {
         this.isBranching = isBranching;
     }
 
-    public ComputationStage<K, V> setVersion(DeweyVersion version) {
+    /**
+     * Creates a new {@link ComputationStage} for the specified {@link DeweyVersion}.
+     * @param version
+     * @return
+     */
+    public ComputationStage<K, V> setVersion(final DeweyVersion version) {
         return new ComputationStageBuilder<K, V>()
                 .setStage(stage)
                 .setVersion(version)
@@ -87,9 +94,6 @@ public class ComputationStage<K, V> {
         return sequence;
     }
 
-    void setBranching(boolean branching) {
-        this.isBranching = branching;
-    }
 
     boolean isBranching() {
         return isBranching;

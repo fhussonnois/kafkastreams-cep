@@ -19,10 +19,10 @@ package com.github.fhuss.kafka.streams.cep.serde;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
-import org.apache.kafka.common.record.ByteBufferInputStream;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
+import org.apache.kafka.common.utils.ByteBufferInputStream;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;

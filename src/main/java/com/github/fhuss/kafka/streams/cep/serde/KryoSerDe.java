@@ -21,10 +21,10 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.esotericsoftware.kryo.pool.KryoPool;
 import com.github.fhuss.kafka.streams.cep.nfa.buffer.SharedVersionedBuffer;
-import org.apache.kafka.common.record.ByteBufferInputStream;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
+import org.apache.kafka.common.utils.ByteBufferInputStream;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;

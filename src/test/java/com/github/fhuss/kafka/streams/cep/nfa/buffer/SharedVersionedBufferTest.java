@@ -27,6 +27,8 @@ import com.github.fhuss.kafka.streams.cep.nfa.buffer.impl.StackEventKey;
 import com.github.fhuss.kafka.streams.cep.nfa.buffer.impl.TimedKeyValueSerDes;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.internals.InMemoryKeyValueStore;
 import org.apache.kafka.streams.state.internals.MemoryLRUCache;
 import org.junit.Test;
 
@@ -90,7 +92,7 @@ public class SharedVersionedBufferTest {
     private <K, V> KVSharedVersionedBuffer<K, V> getInMemorySharedBuffer(Serde<K> keySerDe, Serde<V> valueSerDe) {
         TimedKeyValueSerDes<K, V> keyValueSerDes = new TimedKeyValueSerDes<>(keySerDe, valueSerDe);
         KryoSerDe<StackEventKey> kryoSerDe = new KryoSerDe<>();
-        MemoryLRUCache<StackEventKey, TimedKeyValue<K, V>> store = new MemoryLRUCache<>("test", 100, kryoSerDe, Serdes.serdeFrom(keyValueSerDes, keyValueSerDes));
+        KeyValueStore<StackEventKey, TimedKeyValue<K, V>> store = new InMemoryKeyValueStore<>("test", kryoSerDe, Serdes.serdeFrom(keyValueSerDes, keyValueSerDes));
         return new KVSharedVersionedBuffer<>(store);
     }
 }

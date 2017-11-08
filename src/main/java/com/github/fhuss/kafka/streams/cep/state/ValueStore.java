@@ -38,7 +38,7 @@ public class ValueStore<V> {
      * @param run
      * @param backedStore
      */
-    public ValueStore(String topic, int partition, long run, KeyValueStore<SequenceStateKey, V> backedStore) {
+    ValueStore(String topic, int partition, long run, KeyValueStore<SequenceStateKey, V> backedStore) {
         this.backedStore = backedStore;
         this.key = new SequenceStateKey(topic, partition, run);
     }

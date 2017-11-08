@@ -46,6 +46,8 @@ public class NFA<K, V> implements Serializable {
 
     private static final Logger LOG = org.slf4j.LoggerFactory.getLogger(NFA.class);
 
+    private static final long INITIAL_RUNS = 1L;
+
     private StateStoreProvider storeProvider;
 
     private KVSharedVersionedBuffer<K, V> sharedVersionedBuffer;
@@ -57,14 +59,19 @@ public class NFA<K, V> implements Serializable {
     /**
      * Creates a new {@link NFA} instance.
      */
-    public NFA(StateStoreProvider storeProvider, KVSharedVersionedBuffer<K, V> buffer, Collection<Stage<K, V>> stages) {
-        this(storeProvider, buffer, 1L, initComputationStates(stages));
+    public NFA(final StateStoreProvider storeProvider,
+               final KVSharedVersionedBuffer<K, V> buffer,
+               final Collection<Stage<K, V>> stages) {
+        this(storeProvider, buffer, INITIAL_RUNS, initComputationStates(stages));
     }
 
     /**
      * Creates a new {@link NFA} instance.
      */
-    public NFA(StateStoreProvider storeProvider, KVSharedVersionedBuffer<K, V> buffer, Long runs, Queue<ComputationStage<K, V>> computationStages) {
+    public NFA(final StateStoreProvider storeProvider,
+               final KVSharedVersionedBuffer<K, V> buffer,
+               final Long runs,
+               final Queue<ComputationStage<K, V>> computationStages) {
         this.storeProvider = storeProvider;
         this.sharedVersionedBuffer = buffer;
         this.computationStages = computationStages;
@@ -79,7 +86,7 @@ public class NFA<K, V> implements Serializable {
         Queue<ComputationStage<K, V>> q = new LinkedBlockingQueue<>();
         stages.forEach(s -> {
             if (s.isBeginState())
-                q.add(new ComputationStageBuilder().setStage(s).setVersion(new DeweyVersion(1)).setSequence(1L).build());
+                q.add(new ComputationStageBuilder<K, V>().setStage(s).setVersion(new DeweyVersion(1)).setSequence(1L).build());
         });
         return q;
     }
@@ -93,7 +100,7 @@ public class NFA<K, V> implements Serializable {
      *
      * @param event the event to match.
      */
-    public List<Sequence<K, V>> matchPattern(Event<K, V> event) {
+    public List<Sequence<K, V>> matchPattern(final Event<K, V> event) {
 
         int numberOfStateToProcess = computationStages.size();
 
@@ -110,7 +117,7 @@ public class NFA<K, V> implements Serializable {
         return matchConstruction(finalStates);
     }
 
-    private List<Sequence<K, V>> matchConstruction(Collection<ComputationStage<K, V>> states) {
+    private List<Sequence<K, V>> matchConstruction(final Collection<ComputationStage<K, V>> states) {
         return  states.stream()
                 .map(c -> sharedVersionedBuffer.remove(c.getStage(), c.getEvent(), c.getVersion()))
                 .collect(Collectors.toList());
@@ -124,14 +131,14 @@ public class NFA<K, V> implements Serializable {
         );
     }
 
-    private List<ComputationStage<K, V>> getAllNonFinalStates(Collection<ComputationStage<K, V>> states) {
+    private List<ComputationStage<K, V>> getAllNonFinalStates(final Collection<ComputationStage<K, V>> states) {
         return states
                 .stream()
                 .filter(c -> !c.isForwardingToFinalState())
                 .collect(Collectors.toList());
     }
 
-    private List<ComputationStage<K, V>> getAllFinalStates(Collection<ComputationStage<K, V>> states) {
+    private List<ComputationStage<K, V>> getAllFinalStates(final  Collection<ComputationStage<K, V>> states) {
         return states
                 .stream()
                 .filter(ComputationStage::isForwardingToFinalState)
@@ -161,7 +168,9 @@ public class NFA<K, V> implements Serializable {
         return nextComputationStages;
     }
 
-    private Collection<ComputationStage<K, V>> evaluate(ComputationContext<K, V> ctx, Stage<K, V> currentStage, Stage<K, V> previousStage) {
+    private Collection<ComputationStage<K, V>> evaluate(final ComputationContext<K, V> ctx,
+                                                        final Stage<K, V> currentStage,
+                                                        final Stage<K, V> previousStage) {
         ComputationStage<K, V> computationStage = ctx.computationStage;
         final long sequenceID = computationStage.getSequence();
         final Event<K, V> previousEvent = computationStage.getEvent();
