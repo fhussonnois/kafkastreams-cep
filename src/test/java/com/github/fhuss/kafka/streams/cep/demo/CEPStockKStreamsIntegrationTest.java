@@ -29,6 +29,7 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.integration.utils.EmbeddedKafkaCluster;
 import org.apache.kafka.streams.integration.utils.IntegrationTestUtils;
 import org.apache.kafka.streams.kstream.KStream;
@@ -75,7 +76,7 @@ public class CEPStockKStreamsIntegrationTest {
         streamsConfiguration.put(StreamsConfig.APPLICATION_ID_CONFIG, APPLICATION_ID);
         streamsConfiguration.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, CLUSTER.bootstrapServers());
         streamsConfiguration.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
-        streamsConfiguration.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, StockEventSerDe.class);
+        streamsConfiguration.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, StockEventSerde.class);
         streamsConfiguration.put(StreamsConfig.STATE_DIR_CONFIG, TestUtils.tempDirectory("st-test").getPath());
 
         // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
@@ -110,28 +111,11 @@ public class CEPStockKStreamsIntegrationTest {
                 mockTime);
 
         // build query
-        final Pattern<String, StockEvent> pattern = new QueryBuilder<String, StockEvent>()
-                .select()
-                    .where((k, v, ts, store) -> v.volume > 1000)
-                    .<Long>fold("avg", (k, v, curr) -> v.price)
-                    .then()
-                .select()
-                    .zeroOrMore()
-                    .skipTillNextMatch()
-                    .where((k, v, ts, state) -> v.price > (long)state.get("avg"))
-                    .<Long>fold("avg", (k, v, curr) -> (curr + v.price) / 2)
-                    .<Long>fold("volume", (k, v, curr) -> v.volume)
-                    .then()
-                .select()
-                    .skipTillNextMatch()
-                    .where((k, v, ts, state) -> v.volume < 0.8 * state.getOrElse("volume", 0L))
-                    .within(1, TimeUnit.HOURS)
-                .build();
 
         ComplexStreamsBuilder builder = new ComplexStreamsBuilder();
 
         CEPStream<String, StockEvent> stream = builder.stream(INPUT_STREAM);
-        KStream<String, Sequence<String, StockEvent>> stocks = stream.query("Stocks", pattern, Serdes.String(), new StockEventSerDe());
+        KStream<String, Sequence<String, StockEvent>> stocks = stream.query("Stocks", Patterns.STOCKS);
 
         stocks.mapValues(seq -> {
                   JSONObject json = new JSONObject();
@@ -147,7 +131,8 @@ public class CEPStockKStreamsIntegrationTest {
               .through(OUTPUT_STREAM, Produced.with(null, Serdes.String()))
               .print(Printed.toSysOut());
 
-        kafkaStreams = new KafkaStreams(builder.build(), streamsConfiguration);
+        Topology topology = builder.build();
+        kafkaStreams = new KafkaStreams(topology, streamsConfiguration);
         kafkaStreams.start();
 
         final Properties consumerConfig = TestUtils.consumerConfig(

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -14,37 +14,38 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.fhuss.kafka.streams.cep.nfa;
+package com.github.fhuss.kafka.streams.cep.state.internal.serde;
 
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.github.fhuss.kafka.streams.cep.Event;
-import com.github.fhuss.kafka.streams.cep.serde.AbstractKryoSerde;
+import com.github.fhuss.kafka.streams.cep.nfa.ComputationStage;
+import com.github.fhuss.kafka.streams.cep.nfa.ComputationStageBuilder;
+import com.github.fhuss.kafka.streams.cep.nfa.DeweyVersion;
+import com.github.fhuss.kafka.streams.cep.nfa.EdgeOperation;
+import com.github.fhuss.kafka.streams.cep.nfa.Stage;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.stream.Collectors;
 
 
-public class ComputationStageSerDe<K, V>  extends AbstractKryoSerde<Queue<ComputationStage<K, V>>, K, V> {
+public class ComputationStageSerde<K, V>  extends AbstractKryoSerde<Queue<ComputationStage<K, V>>, K, V> {
 
     private Map<String, Stage<K, V>> stagesKeyedByNames;
 
     /**
-     * Creates a new {@link ComputationStageSerDe} instance.
+     * Creates a new {@link ComputationStageSerde} instance.
      */
-    public ComputationStageSerDe(final List<Stage<K, V>> stages,
+    public ComputationStageSerde(final List<Stage<K, V>> stages,
                                  final Serde<K> keys,
                                  final Serde<V> values) {
         super(keys, values);
-        this.stagesKeyedByNames = new HashMap<>();
-        for(Stage<K, V> stage : stages) {
-            stagesKeyedByNames.put(stage.getName(), stage);
-        }
+        this.stagesKeyedByNames = stages.stream().collect(Collectors.toMap(Stage::getName, s -> s));
     }
 
     /**

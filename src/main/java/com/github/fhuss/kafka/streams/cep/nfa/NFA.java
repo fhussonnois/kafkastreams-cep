@@ -18,11 +18,12 @@ package com.github.fhuss.kafka.streams.cep.nfa;
 
 import com.github.fhuss.kafka.streams.cep.Event;
 import com.github.fhuss.kafka.streams.cep.Sequence;
-import com.github.fhuss.kafka.streams.cep.state.StateStoreProvider;
+import com.github.fhuss.kafka.streams.cep.state.SharedVersionedBufferStore;
 import com.github.fhuss.kafka.streams.cep.state.States;
-import com.github.fhuss.kafka.streams.cep.state.ValueStore;
-import com.github.fhuss.kafka.streams.cep.nfa.buffer.impl.KVSharedVersionedBuffer;
 import com.github.fhuss.kafka.streams.cep.pattern.StateAggregator;
+import com.github.fhuss.kafka.streams.cep.state.internal.Aggregate;
+import com.github.fhuss.kafka.streams.cep.state.internal.Aggregated;
+import com.github.fhuss.kafka.streams.cep.state.AggregatesStore;
 import org.slf4j.Logger;
 
 import java.io.Serializable;
@@ -48,34 +49,34 @@ public class NFA<K, V> implements Serializable {
 
     private static final long INITIAL_RUNS = 1L;
 
-    private StateStoreProvider storeProvider;
-
-    private KVSharedVersionedBuffer<K, V> sharedVersionedBuffer;
+    private SharedVersionedBufferStore<K, V> sharedVersionedBuffer;
 
     private Queue<ComputationStage<K, V>> computationStages;
+
+    private final AggregatesStore<K> states;
 
     private AtomicLong runs;
 
     /**
      * Creates a new {@link NFA} instance.
      */
-    public NFA(final StateStoreProvider storeProvider,
-               final KVSharedVersionedBuffer<K, V> buffer,
+    public NFA(final AggregatesStore<K> states,
+               final SharedVersionedBufferStore<K, V> buffer,
                final Collection<Stage<K, V>> stages) {
-        this(storeProvider, buffer, INITIAL_RUNS, initComputationStates(stages));
+        this(states, buffer, INITIAL_RUNS, initComputationStates(stages));
     }
 
     /**
      * Creates a new {@link NFA} instance.
      */
-    public NFA(final StateStoreProvider storeProvider,
-               final KVSharedVersionedBuffer<K, V> buffer,
+    public NFA(final AggregatesStore states,
+               final SharedVersionedBufferStore<K, V> buffer,
                final Long runs,
                final Queue<ComputationStage<K, V>> computationStages) {
-        this.storeProvider = storeProvider;
         this.sharedVersionedBuffer = buffer;
         this.computationStages = computationStages;
         this.runs = new AtomicLong(runs);
+        this.states = states;
     }
 
     public long getRuns() {
@@ -186,7 +187,7 @@ public class NFA<K, V> implements Serializable {
         boolean consumed = false;
         boolean ignored  = false;
 
-        for(Stage.Edge<K, V> e : matchedEdges) {
+        for (Stage.Edge<K, V> e : matchedEdges) {
             Stage<K, V> epsilonStage = Stage.newEpsilonState(currentStage, e.getTarget());
             LOG.debug("[{}]{} - {}", sequenceID, e.getOperation(), currentEvent);
             switch (e.getOperation()) {
@@ -239,7 +240,7 @@ public class NFA<K, V> implements Serializable {
             }
         }
 
-        if(isBranching) {
+        if (isBranching) {
             LOG.debug("new branch from event {}", currentEvent);
             long newSequence = runs.incrementAndGet();
             Event<K, V> latestMatchEvent = ignored ? previousEvent : currentEvent;
@@ -251,33 +252,37 @@ public class NFA<K, V> implements Serializable {
                     .setSequence(newSequence)
                     .setBranching(true);
             nextComputationStages.add(builder.build());
-            currentStage.getAggregates().forEach(agg -> storeProvider.getValueStore(agg.getName(), sequenceID).branch(newSequence));
+
+            currentStage.getAggregates().forEach(agg -> {
+                Aggregated<K> aggregated = new Aggregated<>(currentEvent.key, new Aggregate(agg.getName(), sequenceID));
+                states.branch(aggregated, newSequence);
+            });
 
             sharedVersionedBuffer.branch(previousStage, previousEvent, version);
         }
 
-        if( consumed ) evaluateAggregates(currentStage.getAggregates(), sequenceID, ctx.event.key, ctx.event.value);
+        if (consumed) evaluateAggregates(currentStage.getAggregates(), sequenceID, ctx.event.key, ctx.event.value);
         return nextComputationStages;
     }
 
     private void putToSharedBuffer(Stage<K, V> currentStage, Stage<K, V> previousStage, Event<K, V> previousEvent, Event<K, V> currentEvent, DeweyVersion nextVersion) {
-        if( previousStage != null)
+        if (previousStage != null)
             sharedVersionedBuffer.put(currentStage, currentEvent, previousStage, previousEvent, nextVersion);
         else
             sharedVersionedBuffer.put(currentStage, currentEvent, nextVersion);
     }
 
-    @SuppressWarnings("unchecked")
     private void evaluateAggregates(List<StateAggregator<K, V, Object>> aggregates, long sequence, K key, V value) {
         aggregates.forEach(agg -> {
-            ValueStore store = storeProvider.getValueStore(agg.getName(), sequence);
-            if( store == null) throw new IllegalStateException("State store is not defined: " + agg.getName());
-            store.set(agg.getAggregate().aggregate(key, value, store.get()));
+            Aggregated<K> aggregated = new Aggregated<>(key, new Aggregate(agg.getName(), sequence));
+            Object o = states.find(aggregated);
+            Object newValue = agg.getAggregate().aggregate(key, value, o);
+            states.put(aggregated, newValue);
         });
     }
 
     private List<Stage.Edge<K, V>> matchEdgesAndGet(Event<K, V> event, long sequence, Stage<K, V> currentStage) {
-        States store = new States(storeProvider, sequence);
+        States<K> store = new States<>(states, event.key, sequence);
         return currentStage.getEdges()
                 .stream()
                 .filter(e -> e.matches(event.key, event.value, event.timestamp, store))

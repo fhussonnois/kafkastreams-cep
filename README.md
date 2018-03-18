@@ -101,15 +101,30 @@ Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-si
 
         Topology topology = new Topology()
                 .addSource("source", "StockEvents")
-                .addProcessor("cep", () -> new CEPProcessor<>(queryName, pattern), "source")
-                .addSink("sink", "Matches", "cep");
+                .addProcessor("cep-processor", () -> new CEPProcessor<>(queryName, pattern), "source")
+                .addSink("sink", "Matches", "cep-processor");
 
         // utility class to register all stores associated with the pattern.
         CEPStoreBuilders<String, StockEvent> builders = new CEPStoreBuilders<>();
-        builders.addStateStores(topology, "cep", queryName, pattern, Serdes.String(), new StockEventSerDe());
+        builders.addStateStores(topology, "cep-processor", queryName, pattern, Serdes.String(), new StockEventSerDe());
+        
+        CEPStoreBuilders<K, V> storeBuilders = new CEPStoreBuilders<>(queryName, pattern);
+        topology.addStateStore(storeBuilders.getEventBufferStoreBuilder(keySerde, valueSerde), "cep-processor");
+        topology.addStateStore(storeBuilders.getNFAStateStoreBuilder(keySerde, valueSerde), "cep-processor");
+        topology.addStateStore(storeBuilders.getAggregateStateStores(), "cep-processor");
         
         KafkaStreams streams = new KafkaStreams(topology, props);
 ```
+
+## States
+
+To track the states of matched sequences, KafkaStreamsCEP needs to create three persistent stores for each query.
+This state stores will result in the creationf of the following changelog topics :  
+
+- <application_id>-<query_name>-streamscep-aggregates-changelog
+- <application_id>-<query_name>-streamscep-matched-changelog
+- <application_id>-<query_name>-streamscep-states-changelog
+
 
 ## Demo
 

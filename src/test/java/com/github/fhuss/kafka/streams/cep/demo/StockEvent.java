@@ -18,6 +18,7 @@ package com.github.fhuss.kafka.streams.cep.demo;
 
 
 public class StockEvent {
+    
     public String name;
     public long price;
     public long volume;

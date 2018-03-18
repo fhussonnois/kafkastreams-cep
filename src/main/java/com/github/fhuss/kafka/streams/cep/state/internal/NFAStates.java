@@ -14,28 +14,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.fhuss.kafka.streams.cep.processor.internal;
+package com.github.fhuss.kafka.streams.cep.state.internal;
 
 import com.github.fhuss.kafka.streams.cep.nfa.ComputationStage;
 
 import java.io.Serializable;
 import java.util.Queue;
 
-public class NFAStateValue<K, V> implements Comparable<NFAStateValue>, Serializable {
+public class NFAStates<K, V> implements Comparable<NFAStates>, Serializable {
 
     private Queue<ComputationStage<K, V>> computationStages;
     private Long runs;
     private Long latestOffset;
 
-    public NFAStateValue(){}
+    public NFAStates(){}
 
     /**
-     * Creates a new {@link NFAStateValue} instance.
+     * Creates a new {@link NFAStates} instance.
      * @param computationStages
      * @param runs
      * @param latestOffset
      */
-    public NFAStateValue(final Queue<ComputationStage<K, V>> computationStages, final Long runs, final Long latestOffset) {
+    public NFAStates(final Queue<ComputationStage<K, V>> computationStages,
+                     final Long runs,
+                     final Long latestOffset) {
         this.computationStages = computationStages;
         this.runs = runs;
         this.latestOffset = latestOffset;
@@ -59,7 +61,7 @@ public class NFAStateValue<K, V> implements Comparable<NFAStateValue>, Serializa
     }
 
     @Override
-    public int compareTo(NFAStateValue that) {
+    public int compareTo(NFAStates that) {
         return this.latestOffset.compareTo(that.latestOffset);
     }
 }

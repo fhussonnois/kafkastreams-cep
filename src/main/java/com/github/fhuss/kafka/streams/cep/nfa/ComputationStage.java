@@ -28,7 +28,12 @@ import java.util.List;
  */
 public class ComputationStage<K, V> {
 
-    private final Stage<K , V> stage;
+    /**
+     * The name of stage.
+     */
+    private final String name;
+
+    private Stage<K , V> stage;
 
     /**
      * The pointer to the most recent event into the share buffer.
@@ -45,12 +50,35 @@ public class ComputationStage<K, V> {
      */
     private final DeweyVersion version;
 
+
     private final long sequence;
 
     /**
      * Flag to indicate this computation stage is the first of a new branch.
      */
     private final boolean isBranching;
+
+    /**
+     * Creates a new {@link ComputationStage} instance.
+     * @param version
+     * @param event
+     * @param timestamp
+     * @param sequence
+     * @param isBranching
+     */
+    ComputationStage(final String name,
+                     final DeweyVersion version,
+                     final Event<K, V> event,
+                     final long timestamp,
+                     final long sequence,
+                     final boolean isBranching) {
+        this.name = name;
+        this.event = event;
+        this.timestamp = timestamp;
+        this.version = version;
+        this.sequence = sequence;
+        this.isBranching = isBranching;
+    }
 
     /**
      * Creates a new {@link ComputationStage} instance.
@@ -67,6 +95,7 @@ public class ComputationStage<K, V> {
                      final long timestamp,
                      final long sequence,
                      final boolean isBranching) {
+        this.name = stage.getName();
         this.stage = stage;
         this.event = event;
         this.timestamp = timestamp;
@@ -95,7 +124,7 @@ public class ComputationStage<K, V> {
     }
 
 
-    boolean isBranching() {
+    public boolean isBranching() {
         return isBranching;
     }
 
@@ -106,7 +135,7 @@ public class ComputationStage<K, V> {
     /**
      * @see {@link Stage#isBeginState()}.
      */
-    boolean isBeginState() {
+    public boolean isBeginState() {
         return stage.isBeginState();
     }
 

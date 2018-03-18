@@ -18,34 +18,24 @@ package com.github.fhuss.kafka.streams.cep.nfa;
 
 import com.github.fhuss.kafka.streams.cep.Event;
 import com.github.fhuss.kafka.streams.cep.Sequence;
-import com.github.fhuss.kafka.streams.cep.nfa.buffer.impl.KVSharedVersionedBuffer;
-import com.github.fhuss.kafka.streams.cep.nfa.buffer.impl.TimedKeyValue;
-import com.github.fhuss.kafka.streams.cep.nfa.buffer.impl.StackEventKey;
-import com.github.fhuss.kafka.streams.cep.nfa.buffer.impl.TimedKeyValueSerDes;
+import com.github.fhuss.kafka.streams.cep.demo.StockEvent;
+import com.github.fhuss.kafka.streams.cep.demo.StockEventSerde;
+import com.github.fhuss.kafka.streams.cep.state.SharedVersionedBufferStore;
+import com.github.fhuss.kafka.streams.cep.state.internal.AggregatesStoreImpl;
+import com.github.fhuss.kafka.streams.cep.state.internal.SharedVersionedBufferStoreImpl;
 import com.github.fhuss.kafka.streams.cep.pattern.QueryBuilder;
 import com.github.fhuss.kafka.streams.cep.pattern.StagesFactory;
 import com.github.fhuss.kafka.streams.cep.pattern.Pattern;
-import com.github.fhuss.kafka.streams.cep.serde.KryoSerDe;
-import com.github.fhuss.kafka.streams.cep.state.StateStoreProvider;
+import com.github.fhuss.kafka.streams.cep.state.AggregatesStore;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.streams.StreamsMetrics;
-import org.apache.kafka.streams.processor.Cancellable;
-import org.apache.kafka.streams.processor.ProcessorContext;
-import org.apache.kafka.streams.processor.PunctuationType;
-import org.apache.kafka.streams.processor.Punctuator;
-import org.apache.kafka.streams.processor.StateRestoreCallback;
-import org.apache.kafka.streams.processor.StateStore;
-import org.apache.kafka.streams.processor.TaskId;
 import org.apache.kafka.streams.state.internals.InMemoryKeyValueStore;
+import org.apache.kafka.test.NoOpProcessorContext;
 import org.junit.Test;
 
-import java.io.File;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -54,7 +44,6 @@ import static org.junit.Assert.*;
 
 public class NFATest {
 
-    public static final String PATTERN_TEST = "test";
     private Event<String, String> ev1 = new Event<>(null, "A", System.currentTimeMillis(), "test", 0, 0);
     private Event<String, String> ev2 = new Event<>(null, "B", System.currentTimeMillis(), "test", 0, 1);
     private Event<String, String> ev3 = new Event<>(null, "C", System.currentTimeMillis(), "test", 0, 2);
@@ -64,7 +53,7 @@ public class NFATest {
     @Test
     public void testNFAWithOneRunAndStrictContiguity() {
 
-        Pattern<String, String> query = new QueryBuilder<String, String>()
+        Pattern<String, String> pattern = new QueryBuilder<String, String>()
                 .select("first")
                     .where((key, value, timestamp, store) -> value.equals("A"))
                 .then()
@@ -75,11 +64,9 @@ public class NFATest {
                     .where((key, value, timestamp, store) -> value.equals("C"))
                 .build();
 
-        List<Stage<String, String>> stages = new StagesFactory<String, String>().make(query);
-        DummyProcessorContext context = new DummyProcessorContext();
-        NFA<String, String> nfa = new NFA<>(new StateStoreProvider("test", context), getInMemorySharedBuffer(Serdes.String(), Serdes.String()), stages);
+        final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
 
-        List<Sequence<String, String>> s = simulate(nfa, context, ev1, ev2, ev3);
+        List<Sequence<String, String>> s = simulate(nfa, ev1, ev2, ev3);
         assertEquals(1, s.size());
         Sequence<String, String> expected = new Sequence<String, String>()
                 .add("first", ev1)
@@ -91,7 +78,7 @@ public class NFATest {
 
     @Test
     public void testNFAWithOneRunAndMultipleMatch() {
-        Pattern<String, String> query = new QueryBuilder<String, String>()
+        Pattern<String, String> pattern = new QueryBuilder<String, String>()
                 .select("firstStage")
                     .where((key, value, timestamp, store) -> value.equals("A"))
                     .then()
@@ -106,11 +93,9 @@ public class NFATest {
                     .where((key, value, timestamp, store) -> value.equals("D"))
                     .build();
 
-        List<Stage<String, String>> stages = new StagesFactory<String, String>().make(query);
-        DummyProcessorContext context = new DummyProcessorContext();
-        NFA<String, String> nfa = new NFA<>(new StateStoreProvider("test", context), getInMemorySharedBuffer(Serdes.String(), Serdes.String()), stages);
+        final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
 
-        List<Sequence<String, String>> s = simulate(nfa, context, ev1, ev2, ev3, ev4, ev5);
+        List<Sequence<String, String>> s = simulate(nfa, ev1, ev2, ev3, ev4, ev5);
         assertEquals(1, s.size());
 
         Sequence<String, String> expected = new Sequence<String, String>()
@@ -140,11 +125,9 @@ public class NFATest {
                     .where((key, value, timestamp, store) -> value.equals("D"))
                 .build();
 
-        List<Stage<String, String>> stages = new StagesFactory<String, String>().make(pattern);
-        DummyProcessorContext context = new DummyProcessorContext();
-        NFA<String, String> nfa = new NFA<>(new StateStoreProvider("test", context), getInMemorySharedBuffer(Serdes.String(), Serdes.String()), stages);
+        final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
 
-        List<Sequence<String, String>> s = simulate(nfa, context, ev1, ev2, ev3, ev4, ev5);
+        List<Sequence<String, String>> s = simulate(nfa, ev1, ev2, ev3, ev4, ev5);
         assertEquals(1, s.size());
         Sequence<String, String> expected = new Sequence<String, String>()
                 .add("first", ev1)
@@ -173,11 +156,9 @@ public class NFATest {
                     .where((key, value, timestamp, store) -> value.equals("D"))
                 .build();
 
-        List<Stage<String, String>> stages = new StagesFactory<String, String>().make(pattern);
-        DummyProcessorContext context = new DummyProcessorContext();
-        NFA<String, String> nfa = new NFA<>(new StateStoreProvider("test", context), getInMemorySharedBuffer(Serdes.String(), Serdes.String()), stages);
+        final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
 
-        List<Sequence<String, String>> s = simulate(nfa, context, ev1, ev2, ev3, ev4, ev5);
+        List<Sequence<String, String>> s = simulate(nfa, ev1, ev2, ev3, ev4, ev5);
         assertEquals(2, s.size());
         Sequence<String, String> expected1 = new Sequence<String, String>()
                 .add("first", ev1)
@@ -194,29 +175,13 @@ public class NFATest {
         assertEquals(expected2, s.get(1));
     }
 
-    private <K, V> List<Sequence<K, V>> simulate(NFA<K, V> nfa, DummyProcessorContext context, Event<K, V>...e) {
+    private <K, V> List<Sequence<K, V>> simulate(NFA<K, V> nfa, Event<K, V>...e) {
         List<Sequence<K, V>> s = new LinkedList<>();
         List<Event<K, V>> events = Arrays.asList(e);
         for(Event<K, V> event : events) {
-            context.set(event.topic, event.partition, event.offset);
             s.addAll(nfa.matchPattern(event));
         }
         return s;
-    }
-
-    @SuppressWarnings("unchecked")
-    private <K, V> KVSharedVersionedBuffer<K, V> getInMemorySharedBuffer(Serde<K> keySerDe, Serde<V> valueSerDe) {
-        return new KVSharedVersionedBuffer<>(newMemoryKeyValueStore("test", keySerDe, valueSerDe));
-    }
-
-    @SuppressWarnings("unchecked")
-    private <K, V> InMemoryKeyValueStore<StackEventKey, TimedKeyValue<K, V>> newMemoryKeyValueStore(
-            final String name,
-            final Serde<K> keySerDe,
-            final Serde<V> valueSerDe) {
-        TimedKeyValueSerDes<K, V> timedKeyValueSerDes = new TimedKeyValueSerDes<>(keySerDe, valueSerDe);
-        KryoSerDe<StackEventKey> kryoSerDe = new KryoSerDe<>();
-        return new InMemoryKeyValueStore<>(name, kryoSerDe, Serdes.serdeFrom(timedKeyValueSerDes, timedKeyValueSerDes));
     }
 
     /**
@@ -234,180 +199,58 @@ public class NFATest {
     @Test
     public void testComplexPatternWithState() {
 
-        StockEvent e1 = new StockEvent(100, 1010);
-        StockEvent e2 = new StockEvent(120, 990);
-        StockEvent e3 = new StockEvent(120, 1005);
-        StockEvent e4 = new StockEvent(121, 999);
-        StockEvent e5 = new StockEvent(120, 999);
-        StockEvent e6 = new StockEvent(125, 750);
-        StockEvent e7 = new StockEvent(120, 950);
-        StockEvent e8 = new StockEvent(120, 700);
+        StockEvent e1 = new StockEvent("e1", 100, 1010);
+        StockEvent e2 = new StockEvent("e2", 120, 990);
+        StockEvent e3 = new StockEvent("e3", 120, 1005);
+        StockEvent e4 = new StockEvent("e4", 121, 999);
+        StockEvent e5 = new StockEvent("e5", 120, 999);
+        StockEvent e6 = new StockEvent("e6", 125, 750);
+        StockEvent e7 = new StockEvent("e7", 120, 950);
+        StockEvent e8 = new StockEvent("e8", 120, 700);
 
-        Pattern<Object, StockEvent> pattern = new QueryBuilder<Object, StockEvent>()
+        Pattern<String, StockEvent> pattern = new QueryBuilder<String, StockEvent>()
                 .select()
                     .where((k, v, ts, store) -> v.volume > 1000)
-                    .<Integer>fold("avg", (k, v, curr) -> v.price)
+                    .<Long>fold("avg", (k, v, curr) -> v.price)
                     .then()
                 .select()
                     .zeroOrMore()
                     .skipTillNextMatch()
-                .where((k, v, ts, state) -> v.price > (int)state.get("avg"))
-                .<Integer>fold("avg", (k, v, curr) -> (curr + v.price) / 2)
-                .<Integer>fold("volume", (k, v, curr) -> v.volume)
+                .where((k, v, ts, state) -> v.price > (long) state.get("avg"))
+                .<Long>fold("avg", (k, v, curr) -> (curr + v.price) / 2)
+                .<Long>fold("volume", (k, v, curr) -> v.volume)
                 .then()
                 .select()
                     .skipTillNextMatch()
-                    .where((k, v, ts, state) -> v.volume < 0.8 * state.getOrElse("volume", 0))
+                    .where((k, v, ts, state) -> v.volume < 0.8 * (long) state.getOrElse("volume", 0L))
                     .within(1, TimeUnit.HOURS)
                 .build();
 
-        List<Stage<Object, StockEvent>> stages = new StagesFactory<Object, StockEvent>().make(pattern);
-        DummyProcessorContext context = new DummyProcessorContext();
-        context.register(newMemoryKeyValueStore(StateStoreProvider.getStateStoreName(PATTERN_TEST, "avg" ), Serdes.Long(), Serdes.Long()), false, null);
-        context.register(newMemoryKeyValueStore(StateStoreProvider.getStateStoreName(PATTERN_TEST, "volume"), Serdes.Long(), Serdes.Long()), false, null);
-        KVSharedVersionedBuffer<Object, StockEvent> inMemorySharedBuffer = getInMemorySharedBuffer(new KryoSerDe<>(), new KryoSerDe<>());
-        NFA<Object, StockEvent> nfa = new NFA<>(new StateStoreProvider(PATTERN_TEST, context), inMemorySharedBuffer, stages);
+        final NFA<String, StockEvent> nfa = newNFA(pattern, Serdes.String(), new StockEventSerde());
 
         AtomicLong offset = new AtomicLong(0);
         List<Event<Object, StockEvent>> collect = Arrays.asList(new StockEvent[]{e1, e2, e3, e4, e5, e6, e7, e8})
-                .stream().map(e -> new Event<>(null, e, System.currentTimeMillis(), "test", 0, offset.getAndIncrement()))
+                .stream()
+                .map(e -> new Event<>(null, e, System.currentTimeMillis(), "test", 0, offset.getAndIncrement()))
                 .collect(Collectors.toList());
-        List<Sequence<Object, StockEvent>> s = simulate(nfa, context, collect.toArray(new Event[collect.size()]));
+
+        List<Sequence<String, StockEvent>> s = simulate(nfa, collect.toArray(new Event[collect.size()]));
         assertEquals(4, s.size());
     }
 
-    public static class StockEvent {
-        public final int price;
-        public final int volume;
+    private <K, V> NFA<K, V> newNFA(Pattern<K, V> pattern, Serde<K> keySerde, Serde<V> valSerde) {
+        List<Stage<K, V>> stages = new StagesFactory<K, V>().make(pattern);
 
-        public StockEvent(int price, int volume) {
-            this.price = price;
-            this.volume = volume;
-        }
+        SharedVersionedBufferStore<K, V> bufferStore =  new SharedVersionedBufferStoreImpl<>(
+                new InMemoryKeyValueStore<>("test-buffer", Serdes.Bytes(), Serdes.ByteArray()), keySerde, valSerde);
+        bufferStore.init(new NoOpProcessorContext(), null);
 
-        @Override
-        public String toString() {
-            final StringBuilder sb = new StringBuilder("StockEvent{");
-            sb.append("price=").append(price);
-            sb.append(", volume=").append(volume);
-            sb.append('}');
-            return sb.toString();
-        }
+        AggregatesStore<K> aggStore = new AggregatesStoreImpl<>(
+                new InMemoryKeyValueStore<>("test-aggregate", Serdes.Bytes(), Serdes.ByteArray())
+        );
+
+        aggStore.init(new NoOpProcessorContext(), null);
+
+        return new NFA<>(aggStore, bufferStore, stages);
     }
-
-    public static class DummyProcessorContext implements ProcessorContext {
-
-        public int partition;
-        public long offset;
-        public String topic;
-
-        public Map<String, StateStore> stores = new HashMap<>();
-
-        public void set(String topic, int partition, long offset) {
-            this.topic = topic;
-            this.partition = partition;
-            this.offset = offset;
-        }
-
-        @Override
-        public String applicationId() {
-            return null;
-        }
-
-        @Override
-        public TaskId taskId() {
-            return null;
-        }
-
-        @Override
-        public Serde<?> keySerde() {
-            return null;
-        }
-
-        @Override
-        public Serde<?> valueSerde() {
-            return null;
-        }
-
-        @Override
-        public File stateDir() {
-            return null;
-        }
-
-        @Override
-        public StreamsMetrics metrics() {
-            return null;
-        }
-
-        @Override
-        public void register(StateStore store, boolean loggingEnabled, StateRestoreCallback stateRestoreCallback) {
-            this.stores.put(store.name(), store);
-        }
-
-        @Override
-        public StateStore getStateStore(String name) {
-            return stores.get(name);
-        }
-
-        @Override
-        public Cancellable schedule(long interval, PunctuationType type, Punctuator callback) {
-            return null;
-        }
-
-        @Override
-        public void schedule(long interval) {
-
-        }
-
-        @Override
-        public <K, V> void forward(K key, V value) {
-
-        }
-
-        @Override
-        public <K, V> void forward(K key, V value, int childIndex) {
-
-        }
-
-        @Override
-        public <K, V> void forward(K key, V value, String childName) {
-
-        }
-
-        @Override
-        public void commit() {
-
-        }
-
-        @Override
-        public String topic() {
-            return topic;
-        }
-
-        @Override
-        public int partition() {
-            return partition;
-        }
-
-        @Override
-        public long offset() {
-            return offset;
-        }
-
-        @Override
-        public long timestamp() {
-            return System.currentTimeMillis();
-        }
-
-        @Override
-        public Map<String, Object> appConfigs() {
-            return null;
-        }
-
-        @Override
-        public Map<String, Object> appConfigsWithPrefix(String prefix) {
-            return null;
-        }
-    }
-
 }

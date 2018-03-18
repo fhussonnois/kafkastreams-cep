@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.fhuss.kafka.streams.cep.nfa.buffer.impl;
+package com.github.fhuss.kafka.streams.cep.state.internal;
 
 import com.github.fhuss.kafka.streams.cep.nfa.DeweyVersion;
 
@@ -24,7 +24,8 @@ import java.util.Collection;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class TimedKeyValue<K, V> implements Serializable, Comparable<TimedKeyValue<K, V>> {
+public class MatchedEvent<K, V> implements Serializable, Comparable<MatchedEvent<K, V>> {
+
     private long timestamp;
     private K key;
     private V value;
@@ -32,11 +33,17 @@ public class TimedKeyValue<K, V> implements Serializable, Comparable<TimedKeyVal
 
     private Collection<Pointer> predecessors;
 
-    TimedKeyValue(K key, V value, long timestamp) {
+    MatchedEvent(final K key,
+                 final V value,
+                 final long timestamp) {
         this(timestamp, key, value, new AtomicLong(1), null);
     }
 
-    TimedKeyValue(long timestamp, K key, V value, AtomicLong refs, Collection<Pointer> predecessors) {
+    public MatchedEvent(final long timestamp,
+                        final K key,
+                        final V value,
+                        final AtomicLong refs,
+                        final Collection<Pointer> predecessors) {
         this.timestamp = timestamp;
         this.key = key;
         this.value = value;
@@ -44,7 +51,7 @@ public class TimedKeyValue<K, V> implements Serializable, Comparable<TimedKeyVal
         this.predecessors = predecessors;
     }
 
-    AtomicLong getRefs() {
+    public AtomicLong getRefs() {
         return refs;
     }
 
@@ -52,11 +59,11 @@ public class TimedKeyValue<K, V> implements Serializable, Comparable<TimedKeyVal
         this.refs.set(ref);
     }
 
-    long incrementRefAndGet() {
+    public long incrementRefAndGet() {
         return this.refs.incrementAndGet();
     }
 
-    long decrementRefAndGet() {
+    public long decrementRefAndGet() {
         return this.refs.get() == 0 ? 0 : this.refs.decrementAndGet();
     }
 
@@ -76,14 +83,14 @@ public class TimedKeyValue<K, V> implements Serializable, Comparable<TimedKeyVal
         this.predecessors.remove(pointer);
     }
 
-    Collection<Pointer> getPredecessors() {
+    public Collection<Pointer> getPredecessors() {
         return predecessors;
     }
 
-    Pointer getPointerByVersion(DeweyVersion version) {
+    public Pointer getPointerByVersion(DeweyVersion version) {
         Pointer ret = null;
-        for(Pointer p : predecessors) {
-            if(version.isCompatible(p.version)) {
+        for (Pointer p : predecessors) {
+            if (version.isCompatible(p.version)) {
                 ret = p;
                 break;
             }
@@ -91,20 +98,20 @@ public class TimedKeyValue<K, V> implements Serializable, Comparable<TimedKeyVal
         return ret;
     }
 
-    void addPredecessor(DeweyVersion version, StackEventKey key) {
-        if( predecessors == null )
+    void addPredecessor(DeweyVersion version, Matched key) {
+        if (predecessors == null )
             predecessors = new ArrayList<>();
         predecessors.add(new Pointer(version, key));
     }
 
     @Override
-    public int compareTo(TimedKeyValue<K, V> that) {
+    public int compareTo(MatchedEvent<K, V> that) {
         return new Long(this.timestamp).compareTo(that.getTimestamp());
     }
 
     @Override
     public String toString() {
-        final StringBuilder sb = new StringBuilder("TimedKeyValue{");
+        final StringBuilder sb = new StringBuilder("MatchedEvent{");
         sb.append("timestamp=").append(timestamp);
         sb.append(", key=").append(key);
         sb.append(", value=").append(value);
@@ -114,8 +121,9 @@ public class TimedKeyValue<K, V> implements Serializable, Comparable<TimedKeyVal
         return sb.toString();
     }
 
-    static class Pointer implements Serializable {
-        private StackEventKey key;
+    public static class Pointer implements Serializable {
+
+        private Matched key;
         private DeweyVersion version;
 
         /**
@@ -123,12 +131,12 @@ public class TimedKeyValue<K, V> implements Serializable, Comparable<TimedKeyVal
          */
         public Pointer() {}
 
-        Pointer(DeweyVersion version, StackEventKey key) {
+        Pointer(final DeweyVersion version, final Matched key) {
             this.version = version;
             this.key = key;
         }
 
-        StackEventKey getKey() {
+        Matched getKey() {
             return key;
         }
 

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -14,19 +14,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.fhuss.kafka.streams.cep.nfa.buffer;
+package com.github.fhuss.kafka.streams.cep.state;
 
 import com.github.fhuss.kafka.streams.cep.Event;
 import com.github.fhuss.kafka.streams.cep.Sequence;
 import com.github.fhuss.kafka.streams.cep.nfa.DeweyVersion;
 import com.github.fhuss.kafka.streams.cep.nfa.Stage;
+import org.apache.kafka.streams.processor.StateStore;
 
 /**
  * A buffer with a compact structure to store partial and complete matches for all runs.
  *
  * Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
  */
-public interface SharedVersionedBuffer<K , V> {
+public interface SharedVersionedBufferStore<K , V> extends StateStore {
 
     /**
      * Adds a new event match into this shared buffer.

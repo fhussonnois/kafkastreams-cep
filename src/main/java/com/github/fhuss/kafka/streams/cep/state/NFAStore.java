@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -14,24 +14,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.fhuss.kafka.streams.cep.pattern;
+package com.github.fhuss.kafka.streams.cep.state;
 
+import com.github.fhuss.kafka.streams.cep.state.internal.NFAStates;
+import com.github.fhuss.kafka.streams.cep.state.internal.TopicAndPartition;
+import org.apache.kafka.streams.processor.StateStore;
 
-public class StateAggregator<K, V, T> {
+public interface NFAStore<K, V> extends StateStore {
 
-    private final String name;
-    private final Aggregator<K, V, T> aggregate;
+    void put(final TopicAndPartition key, final NFAStates<K, V> state);
 
-    StateAggregator(final String name, final Aggregator<K, V, T> aggregate) {
-        this.name = name;
-        this.aggregate = aggregate;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public Aggregator<K, V, T> getAggregate() {
-        return aggregate;
-    }
+    NFAStates<K, V> find(final TopicAndPartition key);
 }
