@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -14,24 +14,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.fhuss.kafka.streams.cep.pattern;
+package com.github.fhuss.kafka.streams.cep.state;
 
+import com.github.fhuss.kafka.streams.cep.state.internal.Aggregated;
+import org.apache.kafka.streams.processor.StateStore;
+import org.apache.kafka.streams.state.KeyValueStore;
 
-public class StateAggregator<K, V, T> {
+/**
+ *  Interface for storing the aggregated values of pattern sequences.
+ */
+public interface AggregatesStore<K> extends StateStore {
 
-    private final String name;
-    private final Aggregator<K, V, T> aggregate;
+    <T> T find(final Aggregated<K> aggregated);
 
-    StateAggregator(final String name, final Aggregator<K, V, T> aggregate) {
-        this.name = name;
-        this.aggregate = aggregate;
-    }
+    /**
+     * {@link KeyValueStore#put(Object, Object)}.
+     */
+    <T> void put(final Aggregated<K> aggregated, final T aggregate);
 
-    public String getName() {
-        return name;
-    }
-
-    public Aggregator<K, V, T> getAggregate() {
-        return aggregate;
-    }
+    void branch(final Aggregated<K> aggregated, final long sequence);
 }

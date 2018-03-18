@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.fhuss.kafka.streams.cep.serde;
+package com.github.fhuss.kafka.streams.cep.state.internal.serde;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
@@ -31,21 +31,17 @@ import java.util.Map;
 public abstract class AbstractKryoSerde <T, K, V>  implements Serializer<T>, Deserializer<T> {
 
     protected Kryo kryo;
-
     protected Serde<K> keys;
-
     protected Serde<V> values;
-
-    public AbstractKryoSerde(AbstractKryoSerde serde) {
-        this(serde.keys, serde.values);
-    }
 
     /**
      * Creates a new {@link AbstractKryoSerde} instance.
      * @param keys Serde used for key.
      * @param values Serde used for value.
      */
-    public AbstractKryoSerde(Serde<K> keys, Serde<V> values) {
+    public AbstractKryoSerde(final Serde<K> keys, final Serde<V> values) {
+        if (keys == null) throw new IllegalArgumentException("keys null");
+        if (values == null) throw new IllegalArgumentException("values null");
         this.keys = keys;
         this.values = values;
         this.kryo = new Kryo();
@@ -57,7 +53,7 @@ public abstract class AbstractKryoSerde <T, K, V>  implements Serializer<T>, Des
 
     @Override
     public T deserialize(String topic, byte[] data) {
-        if( data == null) return null;
+        if (data == null) return null;
         try (Input input = new Input(new ByteBufferInputStream(ByteBuffer.wrap(data)))) {
             return deserialize(topic, input);
         }

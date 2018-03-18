@@ -16,36 +16,41 @@
  */
 package com.github.fhuss.kafka.streams.cep.state;
 
+import com.github.fhuss.kafka.streams.cep.state.internal.Aggregate;
+import com.github.fhuss.kafka.streams.cep.state.internal.Aggregated;
 import org.apache.kafka.streams.state.KeyValueStore;
 
 /**
  * Simple class to wrap a {@link KeyValueStore}.
  */
-public class States {
+public class States<K> {
 
-    private final StateStoreProvider provider;
+    private final AggregatesStore<K> store;
 
-    private long sequence;
+    private final long sequence;
+
+    private final K key;
 
     /**
      * Creates a new {@link States} instance.
-     * @param provider
+     *
+     * @param states
      * @param sequence
      */
-    public States(StateStoreProvider provider, long sequence) {
-        this.provider = provider;
+    public States(final AggregatesStore<K> states, K key, long sequence) {
+        this.store = states;
+        this.key = key;
         this.sequence = sequence;
     }
 
     /**
      * Retrieve the value state for the specified key.
      *
-     * @param key the object key.
+     * @param state the state name.
      * @return <code>null</code> if no state exists for the given key.
      */
-    public Object get(String key) {
-        ValueStore store = provider.getValueStore(key, sequence);
-        return ( store != null ) ? store.get() : null;
+    public <T> T get(String state) {
+        return (T) store.find(new Aggregated<>(key, new Aggregate(state, sequence)));
     }
 
     /**
@@ -58,11 +63,7 @@ public class States {
      */
     @SuppressWarnings("unchecked")
     public <T> T getOrElse(String key, T def) {
-        ValueStore store = provider.getValueStore(key, sequence);
-        if ( store != null ) {
-            T val = (T) store.get();
-            return val != null ? val : def;
-        }
-        else return def;
+        T val = (T) get(key);
+        return val != null ? val : def;
     }
 }

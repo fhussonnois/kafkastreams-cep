@@ -24,7 +24,7 @@ import com.github.fhuss.kafka.streams.cep.Event;
  * @param <K>   the record key type
  * @param <V>   the record value type.
  */
-class ComputationStageBuilder<K, V> {
+public class ComputationStageBuilder<K, V> {
 
     private Stage<K, V> stage;
     private DeweyVersion version;

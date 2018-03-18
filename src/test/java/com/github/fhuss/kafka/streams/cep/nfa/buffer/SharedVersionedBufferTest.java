@@ -19,17 +19,13 @@ package com.github.fhuss.kafka.streams.cep.nfa.buffer;
 import com.github.fhuss.kafka.streams.cep.Sequence;
 import com.github.fhuss.kafka.streams.cep.nfa.DeweyVersion;
 import com.github.fhuss.kafka.streams.cep.nfa.Stage;
-import com.github.fhuss.kafka.streams.cep.nfa.buffer.impl.TimedKeyValue;
-import com.github.fhuss.kafka.streams.cep.serde.KryoSerDe;
+import com.github.fhuss.kafka.streams.cep.state.SharedVersionedBufferStore;
 import com.github.fhuss.kafka.streams.cep.Event;
-import com.github.fhuss.kafka.streams.cep.nfa.buffer.impl.KVSharedVersionedBuffer;
-import com.github.fhuss.kafka.streams.cep.nfa.buffer.impl.StackEventKey;
-import com.github.fhuss.kafka.streams.cep.nfa.buffer.impl.TimedKeyValueSerDes;
+import com.github.fhuss.kafka.streams.cep.state.internal.SharedVersionedBufferStoreImpl;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.internals.InMemoryKeyValueStore;
-import org.apache.kafka.streams.state.internals.MemoryLRUCache;
+import org.apache.kafka.test.NoOpProcessorContext;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -46,9 +42,10 @@ public class SharedVersionedBufferTest {
     private static Stage<String, String> second = new Stage<>("second", Stage.StateType.NORMAL);
     private static Stage<String, String> latest = new Stage<>("latest", Stage.StateType.FINAL);
 
+    private SharedVersionedBufferStore<String, String> buffer  = this.getInMemorySharedBuffer(Serdes.String(), Serdes.String());
+
     @Test
     public void testExtractPatternsWithOneRun() {
-        KVSharedVersionedBuffer<String, String> buffer = this.getInMemorySharedBuffer(Serdes.String(), Serdes.String());
         buffer.put(first, ev1, new DeweyVersion("1"));
         buffer.put(second, ev2, first, ev1, new DeweyVersion("1.0"));
         buffer.put(latest, ev3, second, ev2, new DeweyVersion("1.0.0"));
@@ -63,8 +60,6 @@ public class SharedVersionedBufferTest {
 
     @Test
     public void testExtractPatternsWithBranchingRun() {
-        KVSharedVersionedBuffer<String, String> buffer = this.getInMemorySharedBuffer(Serdes.String(), Serdes.String());
-
         buffer.put(first, ev1, new DeweyVersion("1"));
         buffer.put(second, ev2, first, ev1, new DeweyVersion("1.0"));
         buffer.put(latest, ev3, second, ev2, new DeweyVersion("1.0.0"));
@@ -89,10 +84,10 @@ public class SharedVersionedBufferTest {
     }
 
     @SuppressWarnings("unchecked")
-    private <K, V> KVSharedVersionedBuffer<K, V> getInMemorySharedBuffer(Serde<K> keySerDe, Serde<V> valueSerDe) {
-        TimedKeyValueSerDes<K, V> keyValueSerDes = new TimedKeyValueSerDes<>(keySerDe, valueSerDe);
-        KryoSerDe<StackEventKey> kryoSerDe = new KryoSerDe<>();
-        KeyValueStore<StackEventKey, TimedKeyValue<K, V>> store = new InMemoryKeyValueStore<>("test", kryoSerDe, Serdes.serdeFrom(keyValueSerDes, keyValueSerDes));
-        return new KVSharedVersionedBuffer<>(store);
+    private <K, V> SharedVersionedBufferStore<K, V> getInMemorySharedBuffer(Serde<K> keySerDe, Serde<V> valueSerDe) {
+        InMemoryKeyValueStore test = new InMemoryKeyValueStore("test", Serdes.Bytes(), Serdes.ByteArray());
+        SharedVersionedBufferStore<K, V> store =  new SharedVersionedBufferStoreImpl<>(test, keySerDe, valueSerDe);
+        store.init(new NoOpProcessorContext(), null);
+        return store;
     }
 }

@@ -76,6 +76,7 @@ public class ComplexStreamsBuilder {
         return new CEPStreamImpl<>(stream);
     }
 
+
     public Topology build() {
         return builder.build();
     }

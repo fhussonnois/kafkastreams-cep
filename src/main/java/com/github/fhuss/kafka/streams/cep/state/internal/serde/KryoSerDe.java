@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -14,13 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.fhuss.kafka.streams.cep.serde;
+package com.github.fhuss.kafka.streams.cep.state.internal.serde;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.esotericsoftware.kryo.pool.KryoPool;
-import com.github.fhuss.kafka.streams.cep.nfa.buffer.SharedVersionedBuffer;
+import com.github.fhuss.kafka.streams.cep.state.SharedVersionedBufferStore;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
@@ -31,12 +31,10 @@ import java.nio.ByteBuffer;
 import java.util.Map;
 
 /**
- * {@link Serde} used to serialize and deserialize data into {@link SharedVersionedBuffer}.
+ * {@link Serde} used to serialize and deserialize data into {@link SharedVersionedBufferStore}.
  * @param <T> type of data.
  */
 public class KryoSerDe<T> implements Serde<T> {
-
-    private KryoPool pool;
 
     private KryoSerDeserializer<T> kryoSerDeserializer;
 
@@ -50,9 +48,8 @@ public class KryoSerDe<T> implements Serde<T> {
     }
 
     private void init() {
-        if (this.pool == null) {
-            this.pool = new KryoPool.Builder(Kryo::new).build();
-            this.kryoSerDeserializer = new KryoSerDeserializer<>(pool);
+        if (this.kryoSerDeserializer == null) {
+            this.kryoSerDeserializer = new KryoSerDeserializer<>(KryoPoolProvider.getKryoPool());
         }
     }
 
@@ -67,7 +64,7 @@ public class KryoSerDe<T> implements Serde<T> {
 
     @Override
     public Deserializer<T> deserializer() {
-        return new KryoSerDeserializer<>(pool);
+        return new KryoSerDeserializer<>(KryoPoolProvider.getKryoPool());
     }
 
     private static class KryoSerDeserializer<T> implements Serializer<T>, Deserializer<T> {
@@ -79,14 +76,14 @@ public class KryoSerDe<T> implements Serde<T> {
         }
 
         @Override
-        public void configure(Map<String, ?> configs, boolean isKey) {
+        public void configure(final Map<String, ?> configs, final boolean isKey) {
 
         }
 
         @Override
         @SuppressWarnings("unchecked")
-        public T deserialize(String topic, byte[] data) {
-            if( data == null) return null;
+        public T deserialize(final String topic, final byte[] data) {
+            if (data == null) return null;
 
             Kryo kryo = kryoPool.borrow();
             ByteBufferInputStream bbis = new ByteBufferInputStream(ByteBuffer.wrap(data));
@@ -111,6 +108,15 @@ public class KryoSerDe<T> implements Serde<T> {
         @Override
         public void close() {
 
+        }
+    }
+
+    private static class KryoPoolProvider {
+
+        private static KryoPool POOL = new KryoPool.Builder(Kryo::new).build();
+
+        static KryoPool getKryoPool() {
+            return POOL;
         }
     }
 }

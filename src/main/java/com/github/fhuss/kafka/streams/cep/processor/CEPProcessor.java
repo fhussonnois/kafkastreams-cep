@@ -18,17 +18,18 @@ package com.github.fhuss.kafka.streams.cep.processor;
 
 import com.github.fhuss.kafka.streams.cep.Event;
 import com.github.fhuss.kafka.streams.cep.Sequence;
+import com.github.fhuss.kafka.streams.cep.state.AggregatesStore;
 import com.github.fhuss.kafka.streams.cep.nfa.NFA;
 import com.github.fhuss.kafka.streams.cep.nfa.Stage;
-import com.github.fhuss.kafka.streams.cep.nfa.buffer.impl.KVSharedVersionedBuffer;
+import com.github.fhuss.kafka.streams.cep.state.NFAStore;
+import com.github.fhuss.kafka.streams.cep.state.SharedVersionedBufferStore;
 import com.github.fhuss.kafka.streams.cep.pattern.Pattern;
-import com.github.fhuss.kafka.streams.cep.processor.internal.NFAStateValue;
-import com.github.fhuss.kafka.streams.cep.state.StateStoreProvider;
+import com.github.fhuss.kafka.streams.cep.state.internal.NFAStates;
 import com.github.fhuss.kafka.streams.cep.pattern.StagesFactory;
-import com.github.fhuss.kafka.streams.cep.processor.internal.TopicAndPartition;
+import com.github.fhuss.kafka.streams.cep.state.internal.TopicAndPartition;
+import com.github.fhuss.kafka.streams.cep.state.QueryStores;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.ProcessorContext;
-import org.apache.kafka.streams.state.KeyValueStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,18 +41,20 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
 
     private List<Stage<K, V>> stages;
 
+
     private ProcessorContext context;
 
     private String queryName;
 
     private NFA<K, V> nfa;
 
-    private final String bufferStateStoreName;
-
-    private final String nfaStateStoreName;
-
     private Long highwatermark = -1L;
 
+    private SharedVersionedBufferStore<K, V> bufferStore;
+
+    private AggregatesStore<K> aggregatesStore;
+
+    private NFAStore<K, V> nfaStore;
 
     /**
      * Creates a new {@link CEPProcessor} instance.
@@ -63,34 +66,43 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
         StagesFactory<K, V> fact = new StagesFactory<>();
         this.stages = fact.make(pattern);
         this.queryName = queryName.toLowerCase().replace("\\s+", "");
-
-        this.bufferStateStoreName = StateStoreProvider.getEventBufferStoreName(this.queryName);
-        this.nfaStateStoreName    = StateStoreProvider.getNFAStoreName(this.queryName);
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public void init(ProcessorContext context) {
         this.context = context;
+
+        this.nfaStore = (NFAStore<K, V>)
+                context.getStateStore(QueryStores.getQueryNFAStoreName(queryName));
+
+        this.bufferStore = (SharedVersionedBufferStore<K, V> )
+                context.getStateStore(QueryStores.getQueryEventBufferStoreName(queryName));
+
+        this.aggregatesStore = (AggregatesStore<K>)
+                context.getStateStore(QueryStores.getQueryAggregateStatesStoreName(queryName));
     }
 
-    private NFA<K, V> initializeIfNotAndGet(List<Stage<K, V>> stages) {
+    @SuppressWarnings("unchecked")
+    private void ensureInitStates(List<Stage<K, V>> stages) {
         if( this.nfa == null ) {
-            LOG.info("Initializing NFA for topic={}, partition={}", context.topic(), context.partition());
-            KVSharedVersionedBuffer.Factory<K, V> bufferFactory = KVSharedVersionedBuffer.getFactory();
-            KeyValueStore<TopicAndPartition, NFAStateValue<K, V>>  nfaStore = getNFAStore();
-            TopicAndPartition tp = new TopicAndPartition(context.topic(), context.partition());
-            NFAStateValue<K, V> nfaState = nfaStore.get(tp);
-            KVSharedVersionedBuffer<K, V> buffer = bufferFactory.make(context, bufferStateStoreName);
+            final TopicAndPartition tp = getTopicAndPartition();
+            LOG.info("Initializing NFA for {}", tp);
+
+            NFAStates<K, V> nfaState = nfaStore.find(tp);
+
             if (nfaState != null) {
                 LOG.info("Loading existing nfa states for {}, latest offset {}", tp, nfaState.getLatestOffset());
-                this.nfa = new NFA<>(new StateStoreProvider(queryName, context), buffer, nfaState.getRuns(), nfaState.getComputationStages());
+                this.nfa = new NFA<>(aggregatesStore, bufferStore, nfaState.getRuns(), nfaState.getComputationStages());
                 this.highwatermark = nfaState.getLatestOffset();
             } else {
-                this.nfa = new NFA<>(new StateStoreProvider(queryName, context), buffer, stages);
+                this.nfa = new NFA<>(aggregatesStore, bufferStore, stages);
             }
         }
-        return this.nfa;
+    }
+
+    private TopicAndPartition getTopicAndPartition() {
+        return new TopicAndPartition(context.topic(), context.partition());
     }
 
     /**
@@ -98,14 +110,18 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
      */
     @Override
     public void process(K key, V value) {
-        initializeIfNotAndGet(this.stages);
+        ensureInitStates(this.stages);
         if(value != null && checkHighWaterMarkAndUpdate()) {
             Event<K, V> event = new Event<>(key, value, context.timestamp(), context.topic(), context.partition(), context.offset());
             List<Sequence<K, V>> sequences = this.nfa.matchPattern(event);
-            KeyValueStore<TopicAndPartition, NFAStateValue<K, V>> store = getNFAStore();
-            store.put(new TopicAndPartition(context.topic(), context.partition()), new NFAStateValue<>(this.nfa.getComputationStages(), this.nfa.getRuns(), context.offset() + 1));
+            persistNFA();
             sequences.forEach(seq -> this.context.forward(null, seq));
         }
+    }
+
+    private void persistNFA() {
+        TopicAndPartition key = getTopicAndPartition();
+        this.nfaStore.put(key, new NFAStates<>(this.nfa.getComputationStages(), this.nfa.getRuns(), context.offset() + 1));
     }
 
     private boolean checkHighWaterMarkAndUpdate() {
@@ -115,11 +131,6 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
         }
         this.highwatermark = this.context.offset();
         return true;
-    }
-
-    @SuppressWarnings("unchecked")
-    private KeyValueStore<TopicAndPartition, NFAStateValue<K, V>> getNFAStore() {
-        return (KeyValueStore<TopicAndPartition, NFAStateValue<K, V>>) this.context.getStateStore(nfaStateStoreName);
     }
 
     @Override

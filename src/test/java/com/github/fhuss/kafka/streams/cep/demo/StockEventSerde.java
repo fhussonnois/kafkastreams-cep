@@ -27,7 +27,7 @@ import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 import java.util.Map;
 
-public class StockEventSerDe implements Serde<StockEvent> {
+public class StockEventSerde implements Serde<StockEvent> {
 
     @Override
     public void configure(Map<String, ?> configs, boolean isKey) {
