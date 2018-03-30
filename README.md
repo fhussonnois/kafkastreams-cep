@@ -88,7 +88,7 @@ Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-si
         ComplexStreamsBuilder builder = new ComplexStreamsBuilder();
 
         CEPStream<String, StockEvent> stream = builder.stream("StockEvents");
-        KStream<String, Sequence<String, StockEvent>> stocks = stream.query("Stocks", pattern, Serdes.String(), new StockEventSerDe());
+        KStream<String, Sequence<String, StockEvent>> stocks = stream.query("Stocks", pattern, Queried.with(Serdes.String(), new StockEventSerde()));
         
         KafkaStreams streams = new KafkaStreams(builder.build(), props);
 ```
@@ -106,7 +106,7 @@ Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-si
 
         // utility class to register all stores associated with the pattern.
         CEPStoreBuilders<String, StockEvent> builders = new CEPStoreBuilders<>();
-        builders.addStateStores(topology, "cep-processor", queryName, pattern, Serdes.String(), new StockEventSerDe());
+        builders.addStateStores(topology, "cep-processor", queryName, pattern, Serdes.String(), new StockEventSerde());
         
         CEPStoreBuilders<K, V> storeBuilders = new CEPStoreBuilders<>(queryName, pattern);
         topology.addStateStore(storeBuilders.getEventBufferStoreBuilder(keySerde, valueSerde), "cep-processor");
