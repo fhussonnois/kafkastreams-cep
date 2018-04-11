@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
  */
 public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
 
+    private int id;
     private String name;
     private StateType type;
     private long windowMs = -1;
@@ -49,10 +50,12 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
     /**
      * Creates a new {@link Stage} instance.
      *
-     * @param name  the name of the state.
-     * @param type  the type of the state.
+     * @param id    the identifier of the stage.
+     * @param name  the name of the stage.
+     * @param type  the type of the stage.
      */
-    public Stage(final String name, final StateType type) {
+    public Stage(final int id, final String name, final StateType type) {
+        this.id = id;
         this.name = name;
         this.type = type;
         this.edges = new ArrayList<>();
@@ -67,14 +70,14 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
     }
 
     public Set<String> getStates() {
-        if( aggregates == null) return Collections.EMPTY_SET;
+        if (aggregates == null) return Collections.emptySet();
         return getAggregates()
                 .stream()
                 .map(StateAggregator::getName)
                 .collect(Collectors.toSet());
     }
 
-    long getWindowMs() {
+    public long getWindowMs() {
         return this.windowMs;
     }
 
@@ -88,7 +91,11 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
         return this;
     }
 
-    List<Edge<K, V>> getEdges() {
+    public int getId() {
+        return id;
+    }
+
+    public List<Edge<K, V>> getEdges() {
         return edges;
     }
 
@@ -108,30 +115,33 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
         return type;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Stage<?, ?> stage = (Stage<?, ?>) o;
-        return Objects.equals(name, stage.name) && type == stage.type;
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(name, type);
-    }
-
     public boolean isEpsilonStage() {
         return this.edges.size() == 1 && this.edges.get(0).getOperation().equals(EdgeOperation.PROCEED);
     }
 
-    public Stage<K, V> getTargetByOperation(EdgeOperation op) {
+    public Stage<K, V> getTargetByOperation(final EdgeOperation op) {
         Stage<K, V> target = null;
         for(Edge<K, V> edge : this.edges)
             if( edge.getOperation().equals(op))
                 target = edge.target;
         return target;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Stage<?, ?> that = (Stage<?, ?>) o;
+        return Objects.equals(this.name, that.name) &&
+                this.type == that.type &&
+                this.id == that.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, name, type);
+    }
+
 
     @Override
     public int compareTo(Stage<K, V> that) {
@@ -159,7 +169,7 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
             this.target = target;
         }
 
-        EdgeOperation getOperation() {
+        public EdgeOperation getOperation() {
             return operation;
         }
 
@@ -167,11 +177,11 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
             return predicate.matches(key, value, timestamp, store);
         }
 
-        Stage<K, V> getTarget() {
+        public Stage<K, V> getTarget() {
             return target;
         }
 
-        public boolean is(EdgeOperation o) {
+        public boolean is(final EdgeOperation o) {
             return this.operation.equals(o);
         }
 
@@ -189,6 +199,7 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder("Stage{");
+        sb.append("id='").append(id).append('\'');
         sb.append("name='").append(name).append('\'');
         sb.append(", type=").append(type);
         sb.append(", edges={");
@@ -211,11 +222,11 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
     }
 
     public enum StateType {
-        BEGIN, NORMAL, FINAL;
+        BEGIN, NORMAL, FINAL
     }
 
-    public static <K, V> Stage<K, V> newEpsilonState(Stage<K, V> current, Stage<K, V> target) {
-        Stage<K, V> newStage = new Stage<>(current.getName(), current.getType());
+    public static <K, V> Stage<K, V> newEpsilonState(final Stage<K, V> current, final Stage<K, V> target) {
+        Stage<K, V> newStage = new Stage<>(current.id, current.getName(), current.getType());
         newStage.addEdge(new Stage.Edge<>(EdgeOperation.PROCEED, (k, v, t, s) -> true, target));
         return newStage;
     }

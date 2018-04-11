@@ -19,9 +19,12 @@ package com.github.fhuss.kafka.streams.cep.pattern;
 import com.github.fhuss.kafka.streams.cep.nfa.EdgeOperation;
 import com.github.fhuss.kafka.streams.cep.nfa.NFA;
 import com.github.fhuss.kafka.streams.cep.nfa.Stage;
+import com.github.fhuss.kafka.streams.cep.pattern.Matcher;
+import com.github.fhuss.kafka.streams.cep.pattern.Pattern;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Default class to build all states based on a sequence pattern.
@@ -31,6 +34,8 @@ import java.util.List;
  * @param <V> the type of the value event.
  */
 public class StagesFactory<K, V> {
+
+    private final AtomicInteger stageId = new AtomicInteger(0);
 
     /**
      * Compiles the specified {@link Pattern}.
@@ -43,26 +48,32 @@ public class StagesFactory<K, V> {
 
         final List<Stage<K, V>> sequence = new ArrayList<>();
 
-        Stage<K, V> successorStage = new Stage<>("$final", Stage.StateType.FINAL);
+        Stage<K, V> successorStage = new Stage<>(nextStageId(), "$final", Stage.StateType.FINAL);
         sequence.add(successorStage);
 
         Pattern<K, V> successorPattern = null;
         Pattern<K, V> currentPattern   = pattern;
 
         while( currentPattern.getAncestor() != null) {
-            successorStage = buildStage(Stage.StateType.NORMAL, currentPattern, successorStage, successorPattern);
-            sequence.add(successorStage);
+            List<Stage<K, V>> stages = buildStages(Stage.StateType.NORMAL, currentPattern, successorStage, successorPattern);
+            sequence.addAll(stages);
+            successorStage = stages.get(stages.size() - 1);
             successorPattern = currentPattern;
             currentPattern = currentPattern.getAncestor();
         }
-
-        Stage<K, V> beginStage = buildStage(Stage.StateType.BEGIN, currentPattern, successorStage, successorPattern);
-        sequence.add(beginStage);
+        sequence.addAll(buildStages(Stage.StateType.BEGIN, currentPattern, successorStage, successorPattern));
 
         return sequence;
     }
 
-    private Stage<K, V> buildStage(Stage.StateType type, Pattern<K, V> currentPattern, Stage<K, V> successorStage, Pattern<K, V> successorPattern) {
+    private int nextStageId() {
+        return stageId.getAndIncrement();
+    }
+
+    private List<Stage<K, V>> buildStages(final Stage.StateType type,
+                                   final Pattern<K, V> currentPattern,
+                                   final Stage<K, V> successorStage,
+                                   final Pattern<K, V> successorPattern) {
 
         final Pattern.Cardinality cardinality = currentPattern.getCardinality();
         Stage.StateType currentType = type;
@@ -71,7 +82,7 @@ public class StagesFactory<K, V> {
 
         if (hasMandatoryState) currentType = Stage.StateType.NORMAL;
 
-        Stage<K, V> stage = new Stage<>(currentPattern.getName(),currentType);
+        Stage<K, V> stage = new Stage<>(nextStageId(), currentPattern.getName(),currentType);
         long windowLengthMs = getWindowLengthMs(currentPattern, successorPattern);
         stage.setWindow(windowLengthMs); // Pushing the time window early
         stage.setAggregates(currentPattern.getAggregates());
@@ -106,16 +117,17 @@ public class StagesFactory<K, V> {
             stage.addEdge(new Stage.Edge<>(EdgeOperation.PROCEED, proceed, successorStage));
         }
 
+        List<Stage<K, V>> stages = new ArrayList<>();
+        stages.add(stage);
         // we need to introduce a required state
         if (hasMandatoryState) {
-            successorStage = stage;
-            stage = new Stage<>(currentPattern.getName(), type);
-            stage.addEdge(new Stage.Edge<>(EdgeOperation.BEGIN,  currentPattern.getPredicate(), successorStage));
-            stage.setWindow(windowLengthMs); // Pushing the time window early
-            stage.setAggregates(currentPattern.getAggregates());
+            final Stage internalStage = new Stage<>(nextStageId(), currentPattern.getName(), type);
+            internalStage.addEdge(new Stage.Edge<>(EdgeOperation.BEGIN, currentPattern.getPredicate(), stage));
+            internalStage.setWindow(windowLengthMs); // Pushing the time window early
+            internalStage.setAggregates(currentPattern.getAggregates());
+            stages.add(internalStage);
         }
-
-        return stage;
+        return stages;
     }
 
     private long getWindowLengthMs(Pattern<K, V> currentPattern, Pattern<K, V> successorPattern) {
