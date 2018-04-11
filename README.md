@@ -18,7 +18,7 @@ Currently, this library supports the following event selection strategies :
  
 ### Maven dependency
 
-For Apache Kafka 0.10.0.1
+For Apache Kafka 0.10.0.1 (deprecated)
 
 Available in [Maven Central](https://search.maven.org/#artifactdetails%7Ccom.github.fhuss%7Ckafka-streams-cep%7C0.1.0%7Cjar)
 
@@ -128,30 +128,35 @@ This state stores will result in the creationf of the following changelog topics
 
 ## Demo
 
-Run the demonstration class **CEPStockKStreamsDemo** :
+Run the demonstration class **CEPStockDemo** :
 
+- Create Input/Ouput streams topics
+```bash
+/bin/kafka-topics --create --topic Stocks --partitions 2 --replication-factor 1 --zookeeper localhost:2181
+Created topic "Stocks".
+
+/bin/kafka-topics --create --topic Matches --partitions 2 --replication-factor 1 --zookeeper localhost:2181
+Created topic "Matches".
+```
 - Produce the following json events **StockEvents**:
 ```bash
-./bin/kafka-console-producer --topic StockEvents --broker-list localhost:9092
+./bin/kafka-console-producer --topic Stocks  --property parse.key=true --property key.separator=, --broker-list localhost:9092
 ```
 
 - Input
 
 ```json
-
-{"name":"e1","price":100,"volume":1010}
-{"name":"e2","price":120,"volume":990}
-{"name":"e3","price":120,"volume":1005}
-{"name":"e4","price":121,"volume":999}
-{"name":"e5","price":120,"volume":999}
-{"name":"e6","price":125,"volume":750}
-{"name":"e7","price":120,"volume":950}
-{"name":"e8","price":120,"volume":700}
-
+key1,{"name":"e1","price":100,"volume":1010}
+key1,{"name":"e2","price":120,"volume":990}
+key1,{"name":"e3","price":120,"volume":1005}
+key1,{"name":"e4","price":121,"volume":999}
+key1,{"name":"e5","price":120,"volume":999}
+key1,{"name":"e6","price":125,"volume":750}
+key1,{"name":"e7","price":120,"volume":950}
+key1,{"name":"e8","price":120,"volume":700}
 ```
 
-
-- Consume from the sink topic **"matches"**
+- Consume from the sink topic **"Matches"**
 
 ```bash
 ./bin/kafka-console-consumer --new-consumer --topic Matches --bootstrap-server localhost:9092
@@ -159,15 +164,14 @@ Run the demonstration class **CEPStockKStreamsDemo** :
 - Output
 
 ```json
-{"0":["e1"],"1":["e2","e3","e4","e5"],"2":["e6"]}
-{"0":["e3"],"1":["e4"],"2":["e6"]}
-{"0":["e1"],"1":["e2","e3","e4","e5","e6","e7"],"2":["e8"]}
-{"0":["e3"],"1":["e4","e6"],"2":["e8"]}
+{"events":[{"name":"stage-1","events":["e1"]},{"name":"stage-2","events":["e2","e3","e4","e5"]},{"name":"stage-3","events":["e6"]}]}
+{"events":[{"name":"stage-1","events":["e3"]},{"name":"stage-2","events":["e4"]},{"name":"stage-3","events":["e6"]}]}
+{"events":[{"name":"stage-1","events":["e1"]},{"name":"stage-2","events":["e2","e3","e4","e5","e6","e7"]},{"name":"stage-3","events":["e8"]}]}
+{"events":[{"name":"stage-1","events":["e3"]},{"name":"stage-2","events":["e4","e6"]},{"name":"stage-3","events":["e8"]}]}
 ```
 
 ## TODO
  * Improve test scenarios
- * Add support for streams grouped by key
 
 ## Contributions
 Any contribution is welcome
