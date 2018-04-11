@@ -188,10 +188,24 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
 
     @Override
     public String toString() {
-        final StringBuilder sb = new StringBuilder("State{");
+        final StringBuilder sb = new StringBuilder("Stage{");
         sb.append("name='").append(name).append('\'');
         sb.append(", type=").append(type);
-        sb.append(", edges=").append(edges);
+        sb.append(", edges={");
+        for (int i = 0; i < edges.size(); i++) {
+            sb.append("Edge{");
+            sb.append("operation=").append(edges.get(i).operation);
+            if (edges.get(i).target != null) {
+                sb.append(", target={");
+                sb.append("name='").append(edges.get(i).target.name).append("'");
+                sb.append("}");
+            }
+            sb.append("}");
+            if (i + 1 < edges.size()) {
+                sb.append(", ");
+            }
+        }
+        sb.append("}");
         sb.append('}');
         return sb.toString();
     }
