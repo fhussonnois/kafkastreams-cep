@@ -38,9 +38,9 @@ public class SharedVersionedBufferTest {
     private static Event<String, String> ev4 = new Event<>("k4", "v4", 1000000004L, "topic-test", 0, 3L);
     private static Event<String, String> ev5 = new Event<>("k5", "v5", 1000000005L, "topic-test", 0, 4L);
 
-    private static Stage<String, String> first  = new Stage<>("first", Stage.StateType.BEGIN);
-    private static Stage<String, String> second = new Stage<>("second", Stage.StateType.NORMAL);
-    private static Stage<String, String> latest = new Stage<>("latest", Stage.StateType.FINAL);
+    private static Stage<String, String> first  = new Stage<>(0, "first", Stage.StateType.BEGIN);
+    private static Stage<String, String> second = new Stage<>(1, "second", Stage.StateType.NORMAL);
+    private static Stage<String, String> latest = new Stage<>(2, "latest", Stage.StateType.FINAL);
 
     private SharedVersionedBufferStore<String, String> buffer  = this.getInMemorySharedBuffer(Serdes.String(), Serdes.String());
 

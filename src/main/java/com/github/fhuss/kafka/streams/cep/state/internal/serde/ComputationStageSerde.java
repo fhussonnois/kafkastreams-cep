@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 
 public class ComputationStageSerde<K, V>  extends AbstractKryoSerde<Queue<ComputationStage<K, V>>, K, V> {
 
-    private Map<String, Stage<K, V>> stagesKeyedByNames;
+    private Map<Integer, Stage<K, V>> stagesKeyedById;
 
     /**
      * Creates a new {@link ComputationStageSerde} instance.
@@ -45,7 +45,7 @@ public class ComputationStageSerde<K, V>  extends AbstractKryoSerde<Queue<Comput
                                  final Serde<K> keys,
                                  final Serde<V> values) {
         super(keys, values);
-        this.stagesKeyedByNames = stages.stream().collect(Collectors.toMap(Stage::getName, s -> s));
+        this.stagesKeyedById = stages.stream().collect(Collectors.toMap(Stage::getId, s -> s));
     }
 
     /**
@@ -66,16 +66,14 @@ public class ComputationStageSerde<K, V>  extends AbstractKryoSerde<Queue<Comput
                    .setTimestamp(input.readLong())
                    .setVersion(new DeweyVersion(input.readString()));
 
-            String stageName     = input.readString();
+            Stage<K, V> currentStage = stagesKeyedById.get(input.readInt());
             boolean isEpsilon    = input.readBoolean();
-
-            Stage<K, V> currentStage = stagesKeyedByNames.get(stageName);
 
             Event<K, V> event = deserializeEvent(topic, input);
 
             if( isEpsilon ) {
-                String targetStageName = input.readString();
-                currentStage = Stage.newEpsilonState(currentStage, stagesKeyedByNames.get(targetStageName));
+                int targetStageId = input.readInt();
+                currentStage = Stage.newEpsilonState(currentStage, stagesKeyedById.get(targetStageId));
             }
 
             ol.add(builder.setEvent(event)
@@ -117,13 +115,12 @@ public class ComputationStageSerde<K, V>  extends AbstractKryoSerde<Queue<Comput
             output.writeLong(data.getSequence());
             output.writeLong(data.getTimestamp());
             output.writeString(data.getVersion().toString());
-            output.writeString(stage.getName());
+            output.writeInt(stage.getId());
             output.writeBoolean(stage.isEpsilonStage());
             serializeEvent(topic, data, output);
 
-
             if (stage.isEpsilonStage()) {
-                output.writeString(stage.getTargetByOperation(EdgeOperation.PROCEED).getName());
+                output.writeInt(stage.getTargetByOperation(EdgeOperation.PROCEED).getId());
             }
         }
     }
