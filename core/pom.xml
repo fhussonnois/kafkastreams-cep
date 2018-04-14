@@ -49,21 +49,14 @@
 
         <dependency>
             <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- START KafkaStreams Test dependencies -->
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-streams</artifactId>
-            <classifier>test</classifier>
-        </dependency>
-
-        <!-- kafka/utils/Scheduler -->
-        <dependency>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka_2.12</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- kafka/utils/MockTime -->
-        <dependency>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka_2.12</artifactId>
             <version>${kafka.version}</version>
             <classifier>test</classifier>
             <scope>test</scope>
@@ -76,16 +69,12 @@
             <classifier>test</classifier>
             <scope>test</scope>
         </dependency>
+        <!-- END KafkaStreams Test dependencies -->
 
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
             <version>3.4</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka-clients</artifactId>
         </dependency>
 
         <dependency>
@@ -106,6 +95,22 @@
             <version>4.11</version>
             <scope>test</scope>
         </dependency>
+
+        <!-- START Logs dependencies -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-core</artifactId>
+            <version>${logback.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>${logback.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- END Logs dependencies -->
     </dependencies>
 
 </project>

@@ -16,38 +16,26 @@
  */
 package com.github.fhuss.kafka.streams.cep;
 
-import kafka.utils.MockTime;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.common.serialization.StringSerializer;
-import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.integration.utils.EmbeddedKafkaCluster;
 import org.apache.kafka.streams.integration.utils.IntegrationTestUtils;
+import org.apache.kafka.test.ProcessorTopologyTestDriver;
 import org.apache.kafka.test.TestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.ClassRule;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 
 public class CEPStockDemoTest {
-
-    private static final int NUM_BROKERS = 1;
-
-    @ClassRule
-    public static final EmbeddedKafkaCluster CLUSTER = new EmbeddedKafkaCluster(NUM_BROKERS);
 
     private static final String APPLICATION_ID       = "streams-cep";
     private static final String INPUT_STREAM         = "stock-events";
@@ -64,83 +52,63 @@ public class CEPStockDemoTest {
     private static final String E7 = "{\"name\":\"e7\",\"price\":120,\"volume\":950}";
     private static final String E8 = "{\"name\":\"e8\",\"price\":120,\"volume\":700}";
 
-    private final MockTime mockTime = CLUSTER.time;
-
     private Properties streamsConfiguration = new Properties();
 
-    private KafkaStreams kafkaStreams;
+    private ProcessorTopologyTestDriver driver;
+    private static final Serde<String> STRING_SERDE = Serdes.String();
 
     @Before
     public void before() {
         streamsConfiguration = new Properties();
         streamsConfiguration.put(StreamsConfig.APPLICATION_ID_CONFIG, APPLICATION_ID);
-        streamsConfiguration.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, CLUSTER.bootstrapServers());
+        streamsConfiguration.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
         streamsConfiguration.put(StreamsConfig.STATE_DIR_CONFIG, TestUtils.tempDirectory("test").getPath());
 
         // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
         streamsConfiguration.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-    }
-
-    @Test
-    public void testStockEventsExample( ) throws ExecutionException, InterruptedException {
-        CLUSTER.createTopic(INPUT_STREAM, 3, NUM_BROKERS);
-        CLUSTER.createTopic(OUTPUT_STREAM, 1, NUM_BROKERS);
-
         streamsConfiguration.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
         streamsConfiguration.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, StockEventSerde.class);
 
-        final Collection<KeyValue<String, String>> batch1 = Arrays.asList(
-                new KeyValue<>(K1, E1),
-                new KeyValue<>(K1, E2),
-                new KeyValue<>(K1, E3),
-                new KeyValue<>(K1, E4),
-                new KeyValue<>(K1, E5),
-                new KeyValue<>(K1, E6),
-                new KeyValue<>(K1, E7),
-                new KeyValue<>(K1, E8)
-        );
-
-        IntegrationTestUtils.produceKeyValuesSynchronously(
-                INPUT_STREAM,
-                batch1,
-                TestUtils.producerConfig(
-                        CLUSTER.bootstrapServers(),
-                        StringSerializer.class,
-                        StringSerializer.class,
-                        new Properties()),
-                mockTime);
-
+        // Create the topology to start testing
         Topology topology = CEPStockDemo.topology("Stocks", INPUT_STREAM, OUTPUT_STREAM);
 
-        kafkaStreams = new KafkaStreams(topology, streamsConfiguration);
-        kafkaStreams.start();
-
-        final Properties consumerConfig = TestUtils.consumerConfig(
-                CLUSTER.bootstrapServers(),
-                StringDeserializer.class,
-                StringDeserializer.class);
-
-        List<KeyValue<String, String>> result = IntegrationTestUtils.readKeyValues(
-                OUTPUT_STREAM, consumerConfig,
-                TimeUnit.SECONDS.toMillis(10), 4);
-
-        Assert.assertEquals(4, result.size());
-
-        for(KeyValue<String, String> kv : result) {
-            Assert.assertEquals("K1", kv.key);
-        }
-
-        Assert.assertEquals("{\"events\":[{\"name\":\"stage-1\",\"events\":[\"e1\"]},{\"name\":\"stage-2\",\"events\":[\"e2\",\"e3\",\"e4\",\"e5\"]},{\"name\":\"stage-3\",\"events\":[\"e6\"]}]}", result.get(0).value);
-        Assert.assertEquals("{\"events\":[{\"name\":\"stage-1\",\"events\":[\"e3\"]},{\"name\":\"stage-2\",\"events\":[\"e4\"]},{\"name\":\"stage-3\",\"events\":[\"e6\"]}]}",result.get(1).value);
-        Assert.assertEquals("{\"events\":[{\"name\":\"stage-1\",\"events\":[\"e1\"]},{\"name\":\"stage-2\",\"events\":[\"e2\",\"e3\",\"e4\",\"e5\",\"e6\",\"e7\"]},{\"name\":\"stage-3\",\"events\":[\"e8\"]}]}",result.get(2).value);
-        Assert.assertEquals("{\"events\":[{\"name\":\"stage-1\",\"events\":[\"e3\"]},{\"name\":\"stage-2\",\"events\":[\"e4\",\"e6\"]},{\"name\":\"stage-3\",\"events\":[\"e8\"]}]}",result.get(3).value);
+        StreamsConfig config = new StreamsConfig(streamsConfiguration);
+        driver = new ProcessorTopologyTestDriver(config, topology);
     }
 
     @After
-    public void shutdown() throws IOException {
-        if (kafkaStreams != null) {
-            kafkaStreams.close(30, TimeUnit.SECONDS);
-        }
+    public void after() throws IOException {
+        driver.close();
         IntegrationTestUtils.purgeLocalStreamsState(streamsConfiguration);
+    }
+
+    @Test
+    public void test( ) {
+
+        driver.process(INPUT_STREAM, K1, E1, STRING_SERDE.serializer(), STRING_SERDE.serializer());
+        driver.process(INPUT_STREAM, K1, E2, STRING_SERDE.serializer(), STRING_SERDE.serializer());
+        driver.process(INPUT_STREAM, K1, E3, STRING_SERDE.serializer(), STRING_SERDE.serializer());
+        driver.process(INPUT_STREAM, K1, E4, STRING_SERDE.serializer(), STRING_SERDE.serializer());
+        driver.process(INPUT_STREAM, K1, E5, STRING_SERDE.serializer(), STRING_SERDE.serializer());
+        driver.process(INPUT_STREAM, K1, E6, STRING_SERDE.serializer(), STRING_SERDE.serializer());
+        driver.process(INPUT_STREAM, K1, E7, STRING_SERDE.serializer(), STRING_SERDE.serializer());
+        driver.process(INPUT_STREAM, K1, E8, STRING_SERDE.serializer(), STRING_SERDE.serializer());
+
+        final List<ProducerRecord> expected = new ArrayList<>();
+        expected.add(new ProducerRecord<>(OUTPUT_STREAM, K1,
+                "{\"events\":[{\"name\":\"stage-1\",\"events\":[\"e1\"]},{\"name\":\"stage-2\",\"events\":[\"e2\",\"e3\",\"e4\",\"e5\"]},{\"name\":\"stage-3\",\"events\":[\"e6\"]}]}"));
+        expected.add(new ProducerRecord<>(OUTPUT_STREAM, K1,
+                "{\"events\":[{\"name\":\"stage-1\",\"events\":[\"e3\"]},{\"name\":\"stage-2\",\"events\":[\"e4\"]},{\"name\":\"stage-3\",\"events\":[\"e6\"]}]}"));
+        expected.add(new ProducerRecord<>(OUTPUT_STREAM, K1,
+                "{\"events\":[{\"name\":\"stage-1\",\"events\":[\"e1\"]},{\"name\":\"stage-2\",\"events\":[\"e2\",\"e3\",\"e4\",\"e5\",\"e6\",\"e7\"]},{\"name\":\"stage-3\",\"events\":[\"e8\"]}]}"));
+        expected.add(new ProducerRecord<>(OUTPUT_STREAM, K1,
+                "{\"events\":[{\"name\":\"stage-1\",\"events\":[\"e3\"]},{\"name\":\"stage-2\",\"events\":[\"e4\",\"e6\"]},{\"name\":\"stage-3\",\"events\":[\"e8\"]}]}"));
+
+        for (int i = 0; i < 4; i ++) {
+            ProducerRecord<String, String> record = driver.readOutput(OUTPUT_STREAM, STRING_SERDE.deserializer(), STRING_SERDE.deserializer());
+            Assert.assertEquals(expected.get(i).key(), record.key());
+            Assert.assertEquals(expected.get(i).value(), record.value());
+
+        }
     }
 }
