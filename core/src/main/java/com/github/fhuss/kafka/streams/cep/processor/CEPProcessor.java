@@ -106,8 +106,12 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
      */
     @Override
     public void process(K key, V value) {
+        // If the key or value is null we don't need to proceed
+        if (key == null || value == null) {
+            return;
+        }
         final NFA<K, V> nfa = loadNFA(this.stages, key);
-        if(value != null && checkHighWaterMarkAndUpdate()) {
+        if (checkHighWaterMarkAndUpdate()) {
             Event<K, V> event = new Event<>(key, value, context.timestamp(), context.topic(), context.partition(), context.offset());
             List<Sequence<K, V>> sequences = nfa.matchPattern(event);
             NFAStates<K, V> state = new NFAStates<>(nfa.getComputationStages(), nfa.getRuns(), context.offset() + 1);
