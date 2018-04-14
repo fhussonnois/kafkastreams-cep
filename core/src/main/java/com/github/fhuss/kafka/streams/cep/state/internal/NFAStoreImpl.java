@@ -19,7 +19,6 @@ package com.github.fhuss.kafka.streams.cep.state.internal;
 import com.github.fhuss.kafka.streams.cep.nfa.Stage;
 import com.github.fhuss.kafka.streams.cep.state.NFAStore;
 import com.github.fhuss.kafka.streams.cep.state.internal.serde.ComputationStageSerde;
-import com.github.fhuss.kafka.streams.cep.state.internal.serde.KryoSerDe;
 import com.github.fhuss.kafka.streams.cep.state.internal.serde.NFAStateValueSerde;
 import com.github.fhuss.kafka.streams.cep.state.internal.serde.RunnedKeySerde;
 import org.apache.kafka.common.serialization.Serde;

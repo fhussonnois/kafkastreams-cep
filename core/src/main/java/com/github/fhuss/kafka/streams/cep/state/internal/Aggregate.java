@@ -23,6 +23,11 @@ public class Aggregate {
     private String name;
     private Long sequence;
 
+    /**
+     * Creates a new {@link Aggregate} instance.
+     * @param name      the aggregate name.
+     * @param sequence  the sequence id.
+     */
     public Aggregate(final String name, final long sequence) {
         this.name = name;
         this.sequence = sequence;
@@ -36,6 +41,12 @@ public class Aggregate {
         return sequence;
     }
 
+    /**
+     * Sets the sequence identifier of this aggregate.
+     *
+     * @param sequence  the new identifier.
+     * @return  a new {@link Aggregate} instance.
+     */
     public Aggregate setSequence(final long sequence) {
         return new Aggregate(name, sequence);
     }

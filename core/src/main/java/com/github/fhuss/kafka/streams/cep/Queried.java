@@ -23,6 +23,11 @@ public class Queried<K, V> {
     private Serde<K> keySerde;
     private Serde<V> valueSerde;
 
+    /**
+     * Creates a new {@link Queried} instance.
+     * @param keySerde
+     * @param valueSerde
+     */
     private Queried(final Serde<K> keySerde, final Serde<V> valueSerde) {
         this.keySerde = keySerde;
         this.valueSerde = valueSerde;

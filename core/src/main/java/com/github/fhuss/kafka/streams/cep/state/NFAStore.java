@@ -20,6 +20,11 @@ import com.github.fhuss.kafka.streams.cep.state.internal.NFAStates;
 import com.github.fhuss.kafka.streams.cep.state.internal.Runned;
 import org.apache.kafka.streams.processor.StateStore;
 
+/**
+ * Default interface to manage {@link NFAStates} storage.
+ * @param <K>   the key type.
+ * @param <V>   the value type.
+ */
 public interface NFAStore<K, V> extends StateStore {
 
     void put(final Runned key, final NFAStates<K, V> state);
