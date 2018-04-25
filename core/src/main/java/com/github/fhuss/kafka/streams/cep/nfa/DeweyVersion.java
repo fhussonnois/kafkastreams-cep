@@ -56,8 +56,12 @@ public class DeweyVersion {
     }
 
     public DeweyVersion addRun() {
+        return addRun(1);
+    }
+
+    public DeweyVersion addRun(final int offset) {
         int[] newDeweyNumber = Arrays.copyOf(versions, versions.length);
-        newDeweyNumber[versions.length - 1]++;
+        newDeweyNumber[versions.length - offset]++;
 
         return new DeweyVersion(newDeweyNumber);
     }

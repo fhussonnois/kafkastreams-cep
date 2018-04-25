@@ -32,7 +32,7 @@ public class StagesFactoryTest {
     @Test
     public void testPatternWithSingleStage() {
         Pattern<String, Integer> pattern = new QueryBuilder<String, Integer>()
-                .select(STAGE_1).where((k, v, ts, store) -> v == 0).build();
+                .select(STAGE_1).where((event, store) -> event.value() == 0).build();
 
         StagesFactory<String, Integer> factory = new StagesFactory<>();
         List<Stage<String, Integer>> stages = factory.make(pattern);
@@ -50,18 +50,16 @@ public class StagesFactoryTest {
         Assert.assertEquals(true, stage1.getEdges().get(0).is(EdgeOperation.BEGIN));
         Assert.assertEquals(stage0, stage1.getEdges().get(0).getTarget());
         Assert.assertEquals(STAGE_1, stage1.getName());
-
-        System.out.println(stages);
     }
 
     @Test
     public void testPatternWithMultipleStages() {
         Pattern<String, Integer> pattern = new QueryBuilder<String, Integer>()
-                .select(STAGE_1).where((k, v, ts, store) -> v == 0)
+                .select(STAGE_1).where((event, store) -> event.value() == 0)
                 .then()
-                .select(STAGE_2).where((k, v, ts, store) -> v % 2 == 0)
+                .select(STAGE_2).where((event, store) -> event.value() % 2 == 0)
                 .then()
-                .select(STAGE_3).where((k, v, ts, store) -> v > 100)
+                .select(STAGE_3).where((event, store) -> event.value() > 100)
                 .build();
 
         StagesFactory<String, Integer> factory = new StagesFactory<>();
@@ -83,11 +81,11 @@ public class StagesFactoryTest {
     @Test
     public void testPatternWithMultipleStagesAndOneOrMore() {
         Pattern<String, Integer> pattern = new QueryBuilder<String, Integer>()
-                .select(STAGE_1).where((k, v, ts, store) -> v == 0)
+                .select(STAGE_1).where((event, store) -> event.value() == 0)
                 .then()
-                .select(STAGE_2).oneOrMore().where((k, v, ts, store) -> v % 2 == 0)
+                .select(STAGE_2).oneOrMore().where((event, store) -> event.value() % 2 == 0)
                 .then()
-                .select(STAGE_3).where((k, v, ts, store) -> v > 100)
+                .select(STAGE_3).where((event, store) -> event.value() > 100)
                 .build();
 
         StagesFactory<String, Integer> factory = new StagesFactory<>();

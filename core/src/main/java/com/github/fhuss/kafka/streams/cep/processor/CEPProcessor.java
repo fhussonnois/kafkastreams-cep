@@ -121,11 +121,13 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
     }
 
     private boolean checkHighWaterMarkAndUpdate() {
+        /**
         if (this.context.offset() < this.highwatermark) {
             LOG.warn("Offset({}) is prior to the current high-water mark({})", this.context.offset(), this.highwatermark);
             return false;
         }
         this.highwatermark = this.context.offset();
+         **/
         return true;
     }
 

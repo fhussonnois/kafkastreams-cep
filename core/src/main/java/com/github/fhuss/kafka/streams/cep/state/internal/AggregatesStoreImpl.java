@@ -59,7 +59,7 @@ public class AggregatesStoreImpl<K> extends WrappedStateStore.AbstractStateStore
     @Override
     public void branch(final Aggregated<K> aggregated, long toSequence) {
         Object o = find(aggregated);
-        if( o != null ) {
+        if (o != null) {
             put(new Aggregated<>(aggregated.getKey(), aggregated.getAggregate().setSequence(toSequence)), o);
         }
     }

@@ -39,18 +39,21 @@ public class SelectBuilder<K, V> {
         return this;
     }
 
+    @Deprecated
     public SelectBuilder<K, V> skipTillNextMatch() {
-        this.pattern.setStrategy(Pattern.SelectStrategy.SKIP_TIL_NEXT_MATCH);
+        this.pattern.setStrategy(Strategy.SKIP_TIL_NEXT_MATCH);
         return this;
     }
 
+    @Deprecated
     public SelectBuilder<K, V> skipTillAnyMatch() {
-        this.pattern.setStrategy(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH);
+        this.pattern.setStrategy(Strategy.SKIP_TIL_ANY_MATCH);
         return this;
     }
 
+    @Deprecated
     public SelectBuilder<K, V> strictContiguity() {
-        this.pattern.setStrategy(Pattern.SelectStrategy.STRICT_CONTIGUITY);
+        this.pattern.setStrategy(Strategy.STRICT_CONTIGUITY);
         return this;
     }
 

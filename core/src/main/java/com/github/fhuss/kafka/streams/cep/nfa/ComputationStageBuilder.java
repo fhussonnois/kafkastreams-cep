@@ -32,6 +32,7 @@ public class ComputationStageBuilder<K, V> {
     private Event<K, V> event       = null;
     private long timestamp          = -1;
     private boolean isBranching     = false;
+    private boolean isIgnore        = false;
 
     public ComputationStageBuilder<K, V> setStage(final Stage<K, V> stage) {
         this.stage = stage;
@@ -63,7 +64,12 @@ public class ComputationStageBuilder<K, V> {
         return this;
     }
 
+    public ComputationStageBuilder<K, V> setIgnore(final boolean isIgnore) {
+        this.isIgnore = isIgnore;
+        return this;
+    }
+
     public ComputationStage<K, V> build() {
-        return new ComputationStage<>(stage, version, event, timestamp, sequence, isBranching);
+        return new ComputationStage<>(stage, version, event, timestamp, sequence, isBranching, isIgnore);
     }
 }

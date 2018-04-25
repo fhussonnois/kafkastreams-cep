@@ -30,6 +30,8 @@ import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.processor.internals.ProcessorStateManager;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StateSerdes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A shared version buffer implementation based on Kafka Streams {@link KeyValueStore}.
@@ -37,6 +39,8 @@ import org.apache.kafka.streams.state.StateSerdes;
  * Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
  */
 public class SharedVersionedBufferStoreImpl<K , V>  extends WrappedStateStore.AbstractStateStore implements SharedVersionedBufferStore<K, V> {
+
+    private static Logger LOG = LoggerFactory.getLogger(SharedVersionedBufferStoreImpl.class);
 
     private KeyValueStore<Bytes, byte[]> bytesStore;
 
@@ -89,9 +93,13 @@ public class SharedVersionedBufferStoreImpl<K , V>  extends WrappedStateStore.Ab
      */
     @SuppressWarnings("unchecked")
     @Override
-    public void put(Stage<K, V> currStage, Event<K, V> currEvent, Stage<K, V> prevStage, Event<K, V> prevEvent, DeweyVersion version) {
-        Matched prevEventKey = new Matched(prevStage.getName(), prevStage.getType(), prevEvent.topic, prevEvent.partition, prevEvent.offset);
-        Matched currEventKey = new Matched(currStage.getName(), currStage.getType(), currEvent.topic, currEvent.partition, currEvent.offset);
+    public void put(final Stage<K, V> currStage,
+                    final Event<K, V> currEvent,
+                    final Stage<K, V> prevStage,
+                    final Event<K, V> prevEvent,
+                    final DeweyVersion version) {
+        Matched prevEventKey = new Matched(prevStage.getName(), prevStage.getType(), prevEvent.topic(), prevEvent.partition(), prevEvent.offset());
+        Matched currEventKey = new Matched(currStage.getName(), currStage.getType(), currEvent.topic(), currEvent.partition(), currEvent.offset());
 
         byte[] prevBytes = this.bytesStore.get(Bytes.wrap(serdes.rawKey(prevEventKey)));
         MatchedEvent sharedPrevEvent = serdes.valueFrom(prevBytes);
@@ -104,13 +112,14 @@ public class SharedVersionedBufferStoreImpl<K , V>  extends WrappedStateStore.Ab
         MatchedEvent sharedCurrEvent = serdes.valueFrom(currBytes);
 
         if (sharedCurrEvent == null) {
-            sharedCurrEvent = new MatchedEvent<>(currEvent.key, currEvent.value, currEvent.timestamp);
+            sharedCurrEvent = new MatchedEvent<>(currEvent.key(), currEvent.value(), currEvent.timestamp());
         }
         sharedCurrEvent.addPredecessor(version, prevEventKey);
+        LOG.debug("Putting event to store with key={}, value={}", currEventKey, sharedCurrEvent);
         this.bytesStore.put(Bytes.wrap(serdes.rawKey(currEventKey)), serdes.rawValue(sharedCurrEvent));
     }
 
-    public void branch(Stage<K, V> stage, Event<K, V> event, DeweyVersion version) {
+    public void branch(final Stage<K, V> stage, final Event<K, V> event, final DeweyVersion version) {
         Matched key = newStackEventKey(stage, event);
         MatchedEvent.Pointer pointer = new MatchedEvent.Pointer(version, key);
         while(pointer != null && (key = pointer.getKey()) != null) {
@@ -127,14 +136,14 @@ public class SharedVersionedBufferStoreImpl<K , V>  extends WrappedStateStore.Ab
      */
     @SuppressWarnings("unchecked")
     @Override
-    public void put(Stage<K, V> stage, Event<K, V> evt, DeweyVersion version) {
-
+    public void put(final Stage<K, V> stage, final Event<K, V> event, final DeweyVersion version) {
         // A MatchedEvent can only by add once to a stack, so there is no need to check for existence.
-        MatchedEvent<K, V> eventValue = new MatchedEvent<>(evt.key, evt.value, evt.timestamp);
-        eventValue.addPredecessor(version, null); // register an empty predecessor to kept track of the version (akka run).
+        MatchedEvent<K, V> value = new MatchedEvent<>(event.key(), event.value(), event.timestamp());
+        value.addPredecessor(version, null); // register an empty predecessor to kept track of the version (akka run).
 
-        final Matched matched = new Matched(stage.getName(), stage.getType(), evt.topic, evt.partition, evt.offset);
-        this.bytesStore.put(Bytes.wrap(serdes.rawKey(matched)), serdes.rawValue(eventValue));
+        final Matched matched = new Matched(stage.getName(), stage.getType(), event.topic(), event.partition(), event.offset());
+        LOG.debug("Putting event to store with key={}, value={}", matched, value);
+        this.bytesStore.put(Bytes.wrap(serdes.rawKey(matched)), serdes.rawValue(value));
     }
 
     /**
@@ -181,11 +190,11 @@ public class SharedVersionedBufferStoreImpl<K , V>  extends WrappedStateStore.Ab
         return builder.build(true);
     }
 
-    private Matched newStackEventKey(Stage<K, V> stage, Event<K, V> event) {
-        return new Matched(stage.getName(), stage.getType(), event.topic, event.partition, event.offset);
+    private Matched newStackEventKey(final Stage<K, V> stage, final Event<K, V> event) {
+        return new Matched(stage.getName(), stage.getType(), event.topic(), event.partition(), event.offset());
     }
 
-    private Event<K, V> newEvent(Matched stateKey, MatchedEvent<K, V> stateValue) {
+    private Event<K, V> newEvent(final Matched stateKey, final MatchedEvent<K, V> stateValue) {
         return new Event<>(
                 stateValue.getKey(),
                 stateValue.getValue(),

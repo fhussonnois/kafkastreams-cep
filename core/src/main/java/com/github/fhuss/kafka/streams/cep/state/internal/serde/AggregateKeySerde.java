@@ -104,6 +104,7 @@ public class AggregateKeySerde<K> implements Serde<Aggregated<K>> {
         }
     }
 
+
     private static class WrappedTopic<K> {
 
         String topic;
@@ -115,7 +116,7 @@ public class AggregateKeySerde<K> implements Serde<Aggregated<K>> {
         public WrappedTopic(){}
 
         public WrappedTopic(final String topic, final Aggregated<K> aggregated) {
-            this.topic = topic;
+            //this.topic = topic;
             this.aggregated = aggregated;
         }
     }

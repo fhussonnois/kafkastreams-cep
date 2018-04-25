@@ -45,22 +45,22 @@ import java.util.concurrent.TimeUnit;
 public class CEPStreamIntegrationTest {
 
     private static final String APPLICATION_ID  = "streams-cep";
-    private static final String INPUT_TOPIC     = "input_topic";
-    private static final String OUTPUT_TOPIC    = "output_topic";
+    private static final String INPUT_TOPIC_1   = "input_topic_1";
+    private static final String OUTPUT_TOPIC_1  = "output_topic_1";
 
 
     private static final Pattern<String, Integer> SIMPLE_PATTERN = new QueryBuilder<String, Integer>()
             .select("stage-1")
-            .where((k, v, ts, store) -> v == 0)
+            .where((event, store) -> event.value() == 0)
             .<Integer>fold("sum", (k, v, curr) -> v)
             .then()
             .select("stage-2")
             .oneOrMore()
-            .where((k, v, ts, store) -> ((int) store.get("sum")) <= 10)
+            .where((event, store) -> ((int) store.get("sum")) <= 10)
             .<Integer>fold("sum", (k, v, curr) -> curr + v)
             .then()
             .select("stage-3")
-            .where((k, v, ts, store) -> ((int) store.get("sum")) + v > 10)
+            .where((event, store) -> ((int) store.get("sum")) + event.value() > 10)
             .within(1, TimeUnit.HOURS)
             .build();
 
@@ -87,20 +87,6 @@ public class CEPStreamIntegrationTest {
         streamsConfiguration.put(StreamsConfig.STATE_DIR_CONFIG, TestUtils.tempDirectory("test").getPath());
         // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
         streamsConfiguration.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-
-        // Build query
-        ComplexStreamsBuilder builder = new ComplexStreamsBuilder();
-
-        CEPStream<String, Integer> stream = builder.stream(INPUT_TOPIC, Consumed.with(STRING_SERDE, Serdes.Integer()));
-        KStream<String, Sequence<String, Integer>> sequences = stream.query(DEFAULT_TEST_QUERY, SIMPLE_PATTERN,
-                Queried.with(STRING_SERDE, Serdes.Integer()));
-
-        sequences.to(OUTPUT_TOPIC, Produced.with(STRING_SERDE, new JsonSequenceSerde<>()));
-
-        Topology topology = builder.build();
-
-        StreamsConfig config = new StreamsConfig(streamsConfiguration);
-        driver = new ProcessorTopologyTestDriver(config, topology);
     }
 
     @After
@@ -111,22 +97,37 @@ public class CEPStreamIntegrationTest {
 
     @Test
     public void testWithMultipleKey() {
-        driver.process(INPUT_TOPIC, K1, 0, STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC, K2, -10, STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC, K2, 0, STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC, K1, 3, STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC, K2, 6, STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC,K1, 1, STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC,K1, 2, STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC,K1, 6, STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC,K2, 4, STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC,K2, 4, STRING_SERDE.serializer(), Serdes.Integer().serializer());
+
+        // Build query
+        ComplexStreamsBuilder builder = new ComplexStreamsBuilder();
+
+        CEPStream<String, Integer> stream = builder.stream(INPUT_TOPIC_1, Consumed.with(STRING_SERDE, Serdes.Integer()));
+        KStream<String, Sequence<String, Integer>> sequences = stream.query(DEFAULT_TEST_QUERY, SIMPLE_PATTERN,
+                Queried.with(STRING_SERDE, Serdes.Integer()));
+
+        sequences.to(OUTPUT_TOPIC_1, Produced.with(STRING_SERDE, new JsonSequenceSerde<>()));
+
+        Topology topology = builder.build();
+
+        StreamsConfig config = new StreamsConfig(streamsConfiguration);
+        driver = new ProcessorTopologyTestDriver(config, topology);
+
+        driver.process(INPUT_TOPIC_1, K1, 0,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
+        driver.process(INPUT_TOPIC_1, K2, -10, STRING_SERDE.serializer(), Serdes.Integer().serializer());
+        driver.process(INPUT_TOPIC_1, K2, 0,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
+        driver.process(INPUT_TOPIC_1, K1, 3,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
+        driver.process(INPUT_TOPIC_1, K2, 6,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
+        driver.process(INPUT_TOPIC_1, K1, 1,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
+        driver.process(INPUT_TOPIC_1, K1, 2,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
+        driver.process(INPUT_TOPIC_1, K1, 6,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
+        driver.process(INPUT_TOPIC_1, K2, 4,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
+        driver.process(INPUT_TOPIC_1, K2, 4,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
 
         // JSON values are de-serialized as double
         List<ProducerRecord<String, Sequence<String, Double>>> results = new ArrayList<>();
 
-        results.add(driver.readOutput(OUTPUT_TOPIC, STRING_SERDE.deserializer(), new JsonSequenceSerde.SequenceDeserializer<>()));
-        results.add(driver.readOutput(OUTPUT_TOPIC, STRING_SERDE.deserializer(), new JsonSequenceSerde.SequenceDeserializer<>()));
+        results.add(driver.readOutput(OUTPUT_TOPIC_1, STRING_SERDE.deserializer(), new JsonSequenceSerde.SequenceDeserializer<>()));
+        results.add(driver.readOutput(OUTPUT_TOPIC_1, STRING_SERDE.deserializer(), new JsonSequenceSerde.SequenceDeserializer<>()));
 
         Assert.assertEquals(2, results.size());
         final ProducerRecord<String, Sequence<String, Double>> kvOne = results.get(0);
@@ -159,7 +160,7 @@ public class CEPStreamIntegrationTest {
         Sequence.Staged<K, V> staged = sequence.getByName(stage);
         List<Event<K, V>> events = new ArrayList<>(staged.getEvents());
         for (int i = 0; i < expected.size(); i++) {
-            Assert.assertEquals(expected.get(i).toString(), events.get(i).value.toString());
+            Assert.assertEquals(expected.get(i).toString(), events.get(i).value().toString());
         }
     }
 }

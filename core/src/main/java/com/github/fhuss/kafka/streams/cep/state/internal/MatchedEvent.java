@@ -157,5 +157,13 @@ public class MatchedEvent<K, V> implements Serializable, Comparable<MatchedEvent
         public int hashCode() {
             return Objects.hash(key, version);
         }
+
+        @Override
+        public String toString() {
+            return "Pointer{" +
+                    "key=" + key +
+                    ", version=" + version +
+                    '}';
+        }
     }
 }

@@ -126,16 +126,16 @@ public class ComputationStageSerde<K, V>  extends AbstractKryoSerde<Queue<Comput
     }
 
     private void serializeEvent(String topic, ComputationStage<K, V> data, Output output) {
-        Event<K, V> event = data.getEvent();
+        Event<K, V> event = data.getLastEvent();
         boolean hasEvent = event != null;
         output.writeBoolean(hasEvent);
         if ( hasEvent ) {
-            output.writeLong(event.offset);
-            output.writeInt(event.partition);
-            output.writeString(event.topic);
-            output.writeLong(event.timestamp);
-            write(topic, keys.serializer(), event.key, output);
-            write(topic, values.serializer(), event.value, output);
+            output.writeLong(event.offset());
+            output.writeInt(event.partition());
+            output.writeString(event.topic());
+            output.writeLong(event.timestamp());
+            write(topic, keys.serializer(), event.key(), output);
+            write(topic, values.serializer(), event.value(), output);
         }
     }
 

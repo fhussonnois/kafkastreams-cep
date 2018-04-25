@@ -33,12 +33,12 @@ public class ComputationStage<K, V> {
      */
     private final String name;
 
-    private Stage<K , V> stage;
+    private final Stage<K , V> stage;
 
     /**
      * The pointer to the most recent event into the share buffer.
      */
-    private final Event<K, V> event;
+    private final Event<K, V> lastEvent;
 
     /**
      * Timestamp of the first event for this pattern.
@@ -59,49 +59,46 @@ public class ComputationStage<K, V> {
     private final boolean isBranching;
 
     /**
-     * Creates a new {@link ComputationStage} instance.
-     * @param version
-     * @param event
-     * @param timestamp
-     * @param sequence
-     * @param isBranching
+     * Flag to indicate this computation stage is the first of a new branch.
      */
-    ComputationStage(final String name,
-                     final DeweyVersion version,
-                     final Event<K, V> event,
-                     final long timestamp,
-                     final long sequence,
-                     final boolean isBranching) {
-        this.name = name;
-        this.event = event;
-        this.timestamp = timestamp;
-        this.version = version;
-        this.sequence = sequence;
-        this.isBranching = isBranching;
-    }
+    private final boolean isIgnored;
 
     /**
      * Creates a new {@link ComputationStage} instance.
      * @param stage
      * @param version
-     * @param event
+     * @param lastEvent
      * @param timestamp
      * @param sequence
      * @param isBranching
      */
     ComputationStage(final Stage<K, V> stage,
                      final DeweyVersion version,
-                     final Event<K, V> event,
+                     final Event<K, V> lastEvent,
                      final long timestamp,
                      final long sequence,
-                     final boolean isBranching) {
-        this.name = stage.getName();
+                     final boolean isBranching,
+                     final boolean IsIgnore) {
+        this(stage.getName(), stage, version, lastEvent, timestamp, sequence, isBranching, IsIgnore);
+    }
+
+    private ComputationStage(final String name,
+                     final Stage<K, V> stage,
+                     final DeweyVersion version,
+                     final Event<K, V> lastEvent,
+                     final long timestamp,
+                     final long sequence,
+                     final boolean isBranching,
+                     final boolean IsIgnore
+    ) {
+        this.name = name;
         this.stage = stage;
-        this.event = event;
+        this.lastEvent = lastEvent;
         this.timestamp = timestamp;
         this.version = version;
         this.sequence = sequence;
         this.isBranching = isBranching;
+        this.isIgnored = IsIgnore;
     }
 
     /**
@@ -113,10 +110,14 @@ public class ComputationStage<K, V> {
         return new ComputationStageBuilder<K, V>()
                 .setStage(stage)
                 .setVersion(version)
-                .setEvent(event)
+                .setEvent(lastEvent)
                 .setTimestamp(timestamp)
                 .setSequence(sequence)
                 .build();
+    }
+
+    public boolean isIgnored() {
+        return isIgnored;
     }
 
     public long getSequence() {
@@ -153,7 +154,7 @@ public class ComputationStage<K, V> {
      */
     boolean isForwardingToFinalState() {
         List<Stage.Edge<K, V>> edges = stage.getEdges();
-        return ( isForwarding()
+        return (isForwarding()
                 && edges.get(0).getTarget().isFinalState());
     }
 
@@ -161,8 +162,8 @@ public class ComputationStage<K, V> {
         return stage;
     }
 
-    public Event<K, V> getEvent() {
-        return event;
+    public Event<K, V> getLastEvent() {
+        return lastEvent;
     }
 
     public long getTimestamp() {
@@ -187,7 +188,7 @@ public class ComputationStage<K, V> {
     public String toString() {
         final StringBuilder sb = new StringBuilder("ComputationStage{");
         sb.append("stage=").append(stage);
-        sb.append(", event=").append(event);
+        sb.append(", lastEvent=").append(lastEvent);
         sb.append(", timestamp=").append(timestamp);
         sb.append(", version=").append(version);
         sb.append('}');

@@ -41,20 +41,7 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
         }
     }
 
-    public enum SelectStrategy {
-        /**
-         * This strategy enforce the selected events to be contiguous in the input stream.
-         */
-        STRICT_CONTIGUITY,
-        /**
-         * This strategy allow to skip irrelevant events until a the next relevant event is selected.
-         */
-        SKIP_TIL_NEXT_MATCH,
-        /**
-         *
-         */
-        SKIP_TIL_ANY_MATCH
-    }
+
 
     private int level;
 
@@ -68,30 +55,31 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
 
     private Pattern<K, V> ancestor;
 
-    private SelectStrategy strategy;
-
     private List<StateAggregator<K, V, Object>> aggregates;
 
     private Cardinality cardinality = Cardinality.ONE;
 
+    private Selected selected;
+
     /**
      * Creates a new {@link Pattern} instance.
      **/
-    Pattern() {
-        this(0, null);
-    }
-    /**
-     * Creates a new {@link Pattern} instance.
-     **/
-    Pattern(final String name) {
-        this(0, name);
+    Pattern(final Selected selected) {
+        this(null, selected);
     }
 
     /**
      * Creates a new {@link Pattern} instance.
      **/
-    Pattern(final int level, final String name) {
-        this(level, name, null);
+    Pattern(final String name, final Selected selected) {
+        this(0, name, selected);
+    }
+
+    /**
+     * Creates a new {@link Pattern} instance.
+     **/
+    Pattern(final int level, final String name, final Selected selected) {
+        this(level, name, selected, null);
     }
 
     /**
@@ -100,7 +88,7 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
      * @param ancestor the ancestor event pattern.
      */
     Pattern(final Pattern<K, V> ancestor) {
-        this(ancestor.level + 1, null, ancestor);
+        this(ancestor.level + 1, null, null, ancestor);
     }
 
     /**
@@ -110,32 +98,46 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
      * @param name     the name of the event.
      * @param ancestor the ancestor event pattern.
      */
-    private Pattern(final int level, final String name, final Pattern<K, V> ancestor) {
+    private Pattern(final int level, final String name, final Selected selected, final Pattern<K, V> ancestor) {
         this.level     = level;
         this.name      = name;
         this.ancestor  = ancestor;
-        this.strategy  = SelectStrategy.STRICT_CONTIGUITY;
         this.aggregates = new ArrayList<>();
+        this.selected = selected == null ? Selected.withStrictContiguity() : selected;
     }
-
 
     public SelectBuilder<K, V> select() {
         return new SelectBuilder<>(this);
     }
 
-    public SelectBuilder<K, V> select(String name) {
+    public SelectBuilder<K, V> select(final Selected selected) {
+        this.selected = selected;
+        return new SelectBuilder<>(this);
+    }
+
+    public SelectBuilder<K, V> select(final String name) {
         this.name = name;
         return new SelectBuilder<>(this);
     }
 
+    public SelectBuilder<K, V> select(final String name, final Selected selected) {
+        this.name = name;
+        this.selected = selected;
+        return new SelectBuilder<>(this);
+    }
+
     @SuppressWarnings("unchecked")
-    <T> Pattern<K, V> addStateAggregator(StateAggregator<K, V, T> aggregator) {
+    <T> Pattern<K, V> addStateAggregator(final StateAggregator<K, V, T> aggregator) {
         this.aggregates.add((StateAggregator<K, V, Object>)aggregator);
         return this;
     }
 
-    void setStrategy(SelectStrategy strategy) {
-        this.strategy = strategy;
+    /**
+     * @deprecated use {@link QueryBuilder#select(Selected)} to specify the event selection strategy to apply.
+     */
+    @Deprecated
+    void setStrategy(final Strategy strategy) {
+        this.selected = this.selected.withStrategy(strategy);
     }
 
     void setWindow(long time, TimeUnit unit) {
@@ -143,14 +145,14 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
         this.windowUnit = unit;
     }
 
-    void addPredicate(Matcher<K, V> predicate) {
+    void addPredicate(final Matcher<K, V> predicate) {
         if (this.predicate == null)
             this.predicate = predicate;
         else
             this.predicate = Matcher.and(this.predicate, predicate);
     }
 
-    void setCardinality(Cardinality cardinality) {
+    void setCardinality(final Cardinality cardinality) {
         this.cardinality = cardinality;
     }
 
@@ -178,8 +180,16 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
         return ancestor;
     }
 
-    SelectStrategy getStrategy() {
-        return strategy;
+    Selected getSelected() {
+        return selected;
+    }
+
+    /**
+     * @deprecated use {@link Pattern#getSelected()}.
+     */
+    @Deprecated
+    Strategy getStrategy() {
+        return selected.getStrategy();
     }
 
     List<StateAggregator<K, V, Object>> getAggregates() { return this.aggregates; }

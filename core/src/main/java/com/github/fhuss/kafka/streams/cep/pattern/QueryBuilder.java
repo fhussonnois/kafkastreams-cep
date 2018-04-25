@@ -19,15 +19,7 @@ package com.github.fhuss.kafka.streams.cep.pattern;
 
 public class QueryBuilder<K, V> {
 
-    /**
-     * Creates a new stage with the specified name.
-     *
-     * @param name the stage name.
-     * @return a new {@link SelectBuilder}.
-     */
-    public SelectBuilder<K, V> select(String name) {
-        return  new SelectBuilder<>(new Pattern<>(name));
-    }
+    private static final Selected DEFAULT_SELECT_STRATEGY = Selected.withStrictContiguity();
 
     /**
      * Creates a new stage with no name.
@@ -35,6 +27,29 @@ public class QueryBuilder<K, V> {
      * @return a new {@link SelectBuilder}.
      */
     public SelectBuilder<K, V> select() {
-        return new SelectBuilder<>(new Pattern<>());
+        return select(DEFAULT_SELECT_STRATEGY);
+    }
+
+    /**
+     * Creates a new stage with the specified name.
+     *
+     * @param name the stage name.
+     * @return a new {@link SelectBuilder}.
+     */
+    public SelectBuilder<K, V> select(final String name) {
+        return select(name, DEFAULT_SELECT_STRATEGY);
+    }
+
+    /**
+     * Creates a new stage with no name.
+     *
+     * @return a new {@link SelectBuilder}.
+     */
+    public SelectBuilder<K, V> select(final Selected selected) {
+        return new SelectBuilder<>(new Pattern<>(selected));
+    }
+
+    public SelectBuilder<K, V> select(final String name, final Selected selected) {
+        return new SelectBuilder<>(new Pattern<>(name, selected));
     }
 }

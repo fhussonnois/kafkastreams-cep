@@ -19,8 +19,6 @@ package com.github.fhuss.kafka.streams.cep.pattern;
 import com.github.fhuss.kafka.streams.cep.nfa.EdgeOperation;
 import com.github.fhuss.kafka.streams.cep.nfa.NFA;
 import com.github.fhuss.kafka.streams.cep.nfa.Stage;
-import com.github.fhuss.kafka.streams.cep.pattern.Matcher;
-import com.github.fhuss.kafka.streams.cep.pattern.Pattern;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -70,6 +68,7 @@ public class StagesFactory<K, V> {
         return stageId.getAndIncrement();
     }
 
+    @SuppressWarnings("unchecked")
     private List<Stage<K, V>> buildStages(final Stage.StateType type,
                                    final Pattern<K, V> currentPattern,
                                    final Stage<K, V> successorStage,
@@ -87,32 +86,36 @@ public class StagesFactory<K, V> {
         stage.setWindow(windowLengthMs); // Pushing the time window early
         stage.setAggregates(currentPattern.getAggregates());
 
+        final Selected selected = currentPattern.getSelected();
+
         final Matcher<K, V> predicate = currentPattern.getPredicate();
+
         EdgeOperation operation = cardinality.equals(Pattern.Cardinality.ONE) ? EdgeOperation.BEGIN : EdgeOperation.TAKE;
         stage.addEdge(new Stage.Edge<>(operation, predicate, successorStage));
 
-        final Pattern.SelectStrategy currentPatternStrategy = currentPattern.getStrategy();
-
         Matcher<K, V> ignore = null;
         // ignore = true
-        if (currentPatternStrategy.equals(Pattern.SelectStrategy.SKIP_TIL_ANY_MATCH) ) {
-            ignore = (key, value, ts, store) -> true;
+        if (selected.getStrategy().equals(Strategy.SKIP_TIL_ANY_MATCH) ) {
+            ignore = new Matcher.TruePredicate<>();
             stage.addEdge(new Stage.Edge<>(EdgeOperation.IGNORE, ignore, null));
         }
 
         // ignore = !(take)
-        if (currentPatternStrategy.equals(Pattern.SelectStrategy.SKIP_TIL_NEXT_MATCH)) {
+        if (selected.getStrategy().equals(Strategy.SKIP_TIL_NEXT_MATCH)) {
             ignore = Matcher.not(predicate);
             stage.addEdge(new Stage.Edge<>(EdgeOperation.IGNORE, ignore, null));
         }
 
         if (operation.equals(EdgeOperation.TAKE) ) {
             // proceed = successor_begin || (!take && !ignore)
-            boolean isStrict = currentPatternStrategy.equals(Pattern.SelectStrategy.STRICT_CONTIGUITY);
+            boolean isStrict = selected.getStrategy().equals(Strategy.STRICT_CONTIGUITY);
+
+            Matcher<K, V> successorPredicate = successorPattern.getPredicate();
+
             Matcher<K, V> proceed =
-                    isStrict ? Matcher.or(successorPattern.getPredicate(), Matcher.not(predicate)) :
+                    isStrict ? Matcher.or(successorPredicate, Matcher.not(predicate)) :
                             Matcher.or(
-                                    successorPattern.getPredicate(),
+                                    successorPredicate,
                                     Matcher.and(Matcher.not(predicate), Matcher.not(ignore)));
             stage.addEdge(new Stage.Edge<>(EdgeOperation.PROCEED, proceed, successorStage));
         }
@@ -123,6 +126,9 @@ public class StagesFactory<K, V> {
         if (hasMandatoryState) {
             final Stage internalStage = new Stage<>(nextStageId(), currentPattern.getName(), type);
             internalStage.addEdge(new Stage.Edge<>(EdgeOperation.BEGIN, currentPattern.getPredicate(), stage));
+            if (ignore != null) {
+                internalStage.addEdge(new Stage.Edge<>(EdgeOperation.IGNORE, ignore, null));
+            }
             internalStage.setWindow(windowLengthMs); // Pushing the time window early
             internalStage.setAggregates(currentPattern.getAggregates());
             stages.add(internalStage);

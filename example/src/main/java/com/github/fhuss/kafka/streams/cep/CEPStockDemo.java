@@ -104,7 +104,7 @@ public class CEPStockDemo {
         seq.matched().forEach( v -> {
             JSONObject stage = new JSONObject();
             stage.put("name", v.getStage());
-            stage.put("events", v.getEvents().stream().map(e -> e.value.name).collect(Collectors.toList()));
+            stage.put("events", v.getEvents().stream().map(e -> e.value().name).collect(Collectors.toList()));
             events.add(stage);
         });
         return json.toJSONString();

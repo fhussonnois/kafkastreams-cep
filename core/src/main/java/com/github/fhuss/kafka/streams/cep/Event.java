@@ -26,17 +26,17 @@ import java.util.Objects;
  */
 public class Event<K, V> implements Comparable<Event<K, V>> {
 
-    public final K key;
+    private final K key;
 
-    public final V value;
+    private final V value;
 
-    public final long timestamp;
+    private final long timestamp;
 
-    public final String topic;
+    private final String topic;
 
-    public final int partition;
+    private final int partition;
 
-    public long offset;
+    private long offset;
 
     /**
      * Creates a new {@link Event} instance.
@@ -44,13 +44,42 @@ public class Event<K, V> implements Comparable<Event<K, V>> {
      * @param key the key for the message
      * @param value the value for the message
      */
-    public Event(K key, V value, long timestamp, String topic, int partition, long offset) {
+    public Event(final K key,
+                 final V value,
+                 final long timestamp,
+                 final String topic,
+                 final int partition,
+                 final long offset) {
         this.key = key;
         this.value = value;
         this.timestamp = timestamp;
         this.topic = topic;
         this.partition = partition;
         this.offset = offset;
+    }
+
+    public K key() {
+        return this.key;
+    }
+
+    public V value() {
+        return this.value;
+    }
+
+    public long timestamp() {
+        return this.timestamp;
+    }
+
+    public String topic() {
+        return this.topic;
+    }
+
+    public int partition() {
+        return this.partition;
+    }
+
+    public long offset() {
+        return this.offset;
     }
 
     @Override

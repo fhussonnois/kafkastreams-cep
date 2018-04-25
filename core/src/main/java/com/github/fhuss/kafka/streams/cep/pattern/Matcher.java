@@ -16,15 +16,18 @@
  */
 package com.github.fhuss.kafka.streams.cep.pattern;
 
+import com.github.fhuss.kafka.streams.cep.Event;
 import com.github.fhuss.kafka.streams.cep.state.States;
+
+import java.util.Objects;
 
 @FunctionalInterface
 public interface Matcher<K, V> {
 
-    boolean matches(K key, V value, long timestamp, States store);
+    boolean matches(final Event<K, V> event, final States store);
 
     static <K, V> Matcher<K, V> not(Matcher<K, V> predicate) {
-        return (key, value, timestamp, stateStore) -> !predicate.matches(key, value, timestamp, stateStore);
+        return (event, stateStore) -> !predicate.matches(event, stateStore);
     }
 
     static <K, V> Matcher<K, V> or(Matcher<K, V> left, Matcher<K, V> right) {
@@ -39,7 +42,7 @@ public interface Matcher<K, V> {
         private Matcher<K, V> left;
         private Matcher<K, V> right;
 
-        public AndPredicate(Matcher<K, V> left, Matcher<K, V> right) {
+        AndPredicate(final Matcher<K, V> left, final Matcher<K, V> right) {
             this.left = left;
             this.right = right;
         }
@@ -48,8 +51,8 @@ public interface Matcher<K, V> {
          * {@inheritDoc}
          */
         @Override
-        public boolean matches(K key, V value, long timestamp, States store) {
-            return left.matches(key, value, timestamp, store) && right.matches(key, value, timestamp, store);
+        public boolean matches(final Event<K, V> event, final States store) {
+            return left.matches(event, store) && right.matches(event, store);
         }
     }
 
@@ -57,7 +60,7 @@ public interface Matcher<K, V> {
         private Matcher<K, V> left;
         private Matcher<K, V> right;
 
-        public OrPredicate(Matcher<K, V> left, Matcher<K, V> right) {
+        OrPredicate(final Matcher<K, V> left, final Matcher<K, V> right) {
             this.left = left;
             this.right = right;
         }
@@ -66,8 +69,36 @@ public interface Matcher<K, V> {
          * {@inheritDoc}
          */
         @Override
-        public boolean matches(K key, V value, long timestamp, States store) {
-            return left.matches(key, value, timestamp, store) || right.matches(key, value, timestamp, store);
+        public boolean matches(final Event<K, V> event, final States store) {
+            return left.matches(event, store) || right.matches(event, store);
+
+        }
+    }
+    class TopicPredicate<K, V> implements Matcher<K, V> {
+
+        private final String topic;
+
+        TopicPredicate(final String topic) {
+            Objects.requireNonNull(topic, "topic can't be null");
+            this.topic = topic;
+        }
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public boolean matches(Event<K, V> event, States store) {
+            return event.topic().equals(topic);
+        }
+    }
+
+    class TruePredicate<K, V> implements Matcher<K, V> {
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public boolean matches(Event<K, V> event, States store) {
+            return true;
         }
     }
 }

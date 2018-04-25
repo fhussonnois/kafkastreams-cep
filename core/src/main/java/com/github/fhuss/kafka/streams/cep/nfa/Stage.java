@@ -16,6 +16,7 @@
  */
 package com.github.fhuss.kafka.streams.cep.nfa;
 
+import com.github.fhuss.kafka.streams.cep.Event;
 import com.github.fhuss.kafka.streams.cep.state.States;
 import com.github.fhuss.kafka.streams.cep.pattern.Matcher;
 import com.github.fhuss.kafka.streams.cep.pattern.StateAggregator;
@@ -106,7 +107,7 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
     boolean isFinalState() {
         return type.equals(StateType.FINAL);
     }
-
+    
     public String getName() {
         return name;
     }
@@ -173,8 +174,8 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
             return operation;
         }
 
-        boolean matches(K key, V value, long timestamp, States store) {
-            return predicate.matches(key, value, timestamp, store);
+        boolean matches(Event<K, V> event, States store) {
+            return predicate.matches(event, store);
         }
 
         public Stage<K, V> getTarget() {
@@ -227,7 +228,7 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
 
     public static <K, V> Stage<K, V> newEpsilonState(final Stage<K, V> current, final Stage<K, V> target) {
         Stage<K, V> newStage = new Stage<>(current.id, current.getName(), current.getType());
-        newStage.addEdge(new Stage.Edge<>(EdgeOperation.PROCEED, (k, v, t, s) -> true, target));
+        newStage.addEdge(new Stage.Edge<>(EdgeOperation.PROCEED, new Matcher.TruePredicate<>(), target));
         return newStage;
     }
 }
