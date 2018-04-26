@@ -8,14 +8,11 @@ This library can be used to extend the [Kafka Streams API](http://kafka.apache.o
 
 It provides a convenient DSL to build complex event queries. 
 
-Currently, this library supports the following event selection strategies :  
+## Quick Start
 
- * `Strict contiguity` :  Selected events must be contiguous in the input stream.
+Add the KafkaStreamsCEP to the dependency of the pom.xml of your project. 
+Note that the last version is currently not available in Maven Central yet.
 
- * `Skip till next match` :Irrelevant events are skipped until an event matching the next pattern is encountered. If multiple events in the stream can match the next pattern only the first of them is selected.
-
- * `Skip till any match` : Irrelevant events are skipped until an event matching the next pattern is encountered. All events in the stream that can match a pattern are selected.
- 
 ### Maven dependency
 
 For Apache Kafka 0.10.0.1 (deprecated)
@@ -38,7 +35,73 @@ As of Apache Kafka 1.0.0
       <artifactId>kafka-streams-cep</artifactId>
       <version>0.2.0-SNAPSHOT</version>
     </dependency>
-```     
+```
+
+### Define a pattern
+
+```java
+        ...
+        
+        Properties streamsConfiguration = new Properties();
+        streamsConfiguration.put(StreamsConfig.APPLICATION_ID_CONFIG, "my-first-cep-app");
+        streamsConfiguration.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        streamsConfiguration.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
+        streamsConfiguration.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
+
+        Pattern<String, String> pattern = new QueryBuilder<String, String>()
+                .select("select-A")
+                    .where((event, store) -> event.value().equals("A"))
+                    .then()
+                .select("select-B")
+                    .where(((event, store) -> event.value().equals("B")))
+                    .then()
+                .select("select-C")
+                    .where(((event, store) -> event.value().equals("C")))
+                .build();
+
+        StreamsBuilder builder = new StreamsBuilder();
+
+        KStream<String, String> letters = builder.stream("Letters");
+
+        KStream<String, Sequence<String, String>> sequences = new ComplexStreamsBuilder().stream(letters)
+                .query("MyLettersQuery", pattern);
+        
+        sequences.print(Printed.toSysOut());
+
+        KafkaStreams kafkaStreams = new KafkaStreams(builder.build(), streamsConfiguration);
+        kafkaStreams.start();
+        
+        ...
+
+```
+
+## The Pattern API
+
+work in progress
+
+## Event Selection Strategies
+
+Currently, this library supports the following event selection strategies :  
+
+ * `Strict contiguity` :  Selected events must be contiguous in the input stream.
+ 
+ <p align="center">
+ <img src="./doc/strict_contiguity.png"/>
+ </p>
+
+ * `Skip till next match` :Irrelevant events are skipped until an event matching the next pattern is encountered. If multiple events in the stream can match the next pattern only the first of them is selected.
+
+ <p align="center">
+ <img src="./doc/skip_till_next_match.png"/>
+ </p>
+ 
+ * `Skip till any match` : Irrelevant events are skipped until an event matching the next pattern is encountered. All events in the stream that can match a pattern are selected.
+ 
+ <p align="center">
+ <img src="./doc/skip_till_any_match.png"/>
+ </p>
+ 
+
 ## Demonstration
 
 The below example is based on the research paper **Efficient Pattern Matching over Event Streams**.
@@ -62,23 +125,20 @@ Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-si
 
 ### Build Query
 ```java
-        Pattern<String, StockEvent> pattern = new QueryBuilder<String, StockEvent>()
-                .select()
-                    .where((k, v, ts, store) -> v.volume > 1000)
-                    .<Integer>fold("avg", (k, v, curr) -> v.price)
-                    .then()
-                .select()
-                    .oneOrMore()
-                    .skipTillNextMatch()
-                    .where((k, v, ts, state) -> v.price > (int)state.get("avg"))
-                    .<Integer>fold("avg", (k, v, curr) -> (curr + v.price) / 2)
-                    .<Integer>fold("volume", (k, v, curr) -> v.volume)
-                    .then()
-                .select()
-                    .skipTillNextMatch()
-                    .where((k, v, ts, state) -> v.volume < (0.8 *  (int)state.get("volume")))
-                    .within(1, TimeUnit.HOURS)
-                .build();
+            .select("stage-1")
+                .where((event, states) -> event.value().volume > 1000)
+                .<Long>fold("avg", (k, v, curr) -> v.price)
+                .then()
+            .select("stage-2", Selected.withSkipTilNextMatch())
+                .zeroOrMore()
+                .where((event, states) -> event.value().price > (long) states.get("avg"))
+                .<Long>fold("avg", (k, v, curr) -> (curr + v.price) / 2)
+                .<Long>fold("volume", (k, v, curr) -> v.volume)
+                .then()
+            .select("stage-3", Selected.withSkipTilNextMatch())
+                .where((event, states) -> event.value().volume < 0.8 * (long) states.getOrElse("volume", 0L))
+            .within(1, TimeUnit.HOURS)
+            .build();
 ```
 
 ### KStreams API:
