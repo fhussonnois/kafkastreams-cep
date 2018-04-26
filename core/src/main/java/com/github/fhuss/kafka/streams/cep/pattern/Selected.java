@@ -20,32 +20,48 @@ public class Selected {
 
     private final Strategy strategy;
 
+    private final String topic;
+
     /**
      * Creates a new {@link Selected} instance.
      *
-     * @param strategy the strategy used to selected relevant events
+     * @param strategy the strategy used to selected relevant events.
+     * @param topic    the name of the topic from which the event
      */
-    private Selected(final Strategy strategy) {
+    private Selected(final Strategy strategy, final String topic) {
         this.strategy = strategy;
+        this.topic = topic;
     }
 
     public static Selected withStrictContiguity() {
-        return new Selected(Strategy.STRICT_CONTIGUITY);
+        return new Selected(Strategy.STRICT_CONTIGUITY, null);
     }
 
     public static Selected withSkipTilAnyMatch() {
-        return new Selected(Strategy.SKIP_TIL_ANY_MATCH);
+        return new Selected(Strategy.SKIP_TIL_ANY_MATCH, null);
     }
 
     public static Selected withSkipTilNextMatch() {
-        return new Selected(Strategy.SKIP_TIL_NEXT_MATCH);
+        return new Selected(Strategy.SKIP_TIL_NEXT_MATCH, null);
     }
 
-    public static Selected withStrategy(final Strategy strategy) {
-        return new Selected(strategy);
+    public static Selected fromTopic(final String topic) {
+        return new Selected(null, topic);
+    }
+
+    public Selected withTopic(final String topic) {
+        return new Selected(strategy, topic);
+    }
+
+    public Selected withStrategy(final Strategy strategy) {
+        return new Selected(strategy, topic);
     }
 
     public Strategy getStrategy() {
         return strategy;
+    }
+
+    public String getTopic() {
+        return topic;
     }
 }

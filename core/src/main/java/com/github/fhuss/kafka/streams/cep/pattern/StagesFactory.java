@@ -88,7 +88,9 @@ public class StagesFactory<K, V> {
 
         final Selected selected = currentPattern.getSelected();
 
-        final Matcher<K, V> predicate = currentPattern.getPredicate();
+        final Matcher<K, V> predicate = (selected.getTopic() != null) ?
+                Matcher.and(new Matcher.TopicPredicate<>(selected.getTopic()), currentPattern.getPredicate()) :
+                currentPattern.getPredicate();
 
         EdgeOperation operation = cardinality.equals(Pattern.Cardinality.ONE) ? EdgeOperation.BEGIN : EdgeOperation.TAKE;
         stage.addEdge(new Stage.Edge<>(operation, predicate, successorStage));
@@ -111,6 +113,10 @@ public class StagesFactory<K, V> {
             boolean isStrict = selected.getStrategy().equals(Strategy.STRICT_CONTIGUITY);
 
             Matcher<K, V> successorPredicate = successorPattern.getPredicate();
+            if (successorPattern.getSelected().getTopic() != null) {
+                Matcher.TopicPredicate<K,V> left = new Matcher.TopicPredicate<>(successorPattern.getSelected().getTopic());
+                successorPredicate = Matcher.and(left, successorPredicate);
+            }
 
             Matcher<K, V> proceed =
                     isStrict ? Matcher.or(successorPredicate, Matcher.not(predicate)) :

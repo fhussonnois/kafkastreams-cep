@@ -16,8 +16,10 @@
  */
 package com.github.fhuss.kafka.streams.cep;
 
+import com.github.fhuss.kafka.streams.cep.pattern.Aggregator;
 import com.github.fhuss.kafka.streams.cep.pattern.Pattern;
 import com.github.fhuss.kafka.streams.cep.pattern.QueryBuilder;
+import com.github.fhuss.kafka.streams.cep.pattern.Selected;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Serde;
@@ -46,6 +48,7 @@ public class CEPStreamIntegrationTest {
 
     private static final String APPLICATION_ID  = "streams-cep";
     private static final String INPUT_TOPIC_1   = "input_topic_1";
+    private static final String INPUT_TOPIC_2   = "input_topic_2";
     private static final String OUTPUT_TOPIC_1  = "output_topic_1";
 
 
@@ -63,6 +66,23 @@ public class CEPStreamIntegrationTest {
             .where((event, store) -> ((int) store.get("sum")) + event.value() > 10)
             .within(1, TimeUnit.HOURS)
             .build();
+
+    private static final Pattern<String, Integer> PATTERN_MULTIPLE_TOPICS = new QueryBuilder<String, Integer>()
+            .select("stage-1", Selected.withStrictContiguity())
+            .where((event, store) -> event.value() == 0)
+            .<Integer>fold("sum", (k, v, curr) -> v)
+            .then()
+            .select("stage-2", Selected.withSkipTilNextMatch().withTopic(INPUT_TOPIC_1))
+            .oneOrMore()
+            .where((event, store) -> (Integer)store.get("sum") <= 10)
+            .<Integer>fold("sum", (k, v, curr) -> curr + v)
+            .then()
+            .select("stage-3", Selected.withSkipTilAnyMatch().withTopic(INPUT_TOPIC_2))
+            .where((event, store) -> event.value() >= ((Integer) store.get("sum")))
+            .fold("sum", (Aggregator<String, Integer, Integer>) (s, v, curr) -> curr)
+            .within(1, TimeUnit.HOURS)
+            .build();
+
 
     private static final String K1 = "K1";
     private static final String K2 = "K2";
@@ -96,7 +116,7 @@ public class CEPStreamIntegrationTest {
     }
 
     @Test
-    public void testWithMultipleKey() {
+    public void testPatternGivenMultipleRecordKeys() {
 
         // Build query
         ComplexStreamsBuilder builder = new ComplexStreamsBuilder();
@@ -148,6 +168,68 @@ public class CEPStreamIntegrationTest {
         driver.close();
     }
 
+    @Test
+    public void testPatternGivenRecordsFromMultipleTopics() {
+
+        // Build query
+        ComplexStreamsBuilder builder = new ComplexStreamsBuilder();
+
+        CEPStream<String, Integer> stream = builder.stream(Arrays.asList(INPUT_TOPIC_1, INPUT_TOPIC_2)
+                , Consumed.with(STRING_SERDE, Serdes.Integer()));
+        KStream<String, Sequence<String, Integer>> sequences = stream.query(DEFAULT_TEST_QUERY, PATTERN_MULTIPLE_TOPICS,
+                Queried.with(STRING_SERDE, Serdes.Integer()));
+
+        sequences.to(OUTPUT_TOPIC_1, Produced.with(STRING_SERDE, new JsonSequenceSerde<>()));
+
+        Topology topology = builder.build();
+
+        StreamsConfig config = new StreamsConfig(streamsConfiguration);
+        driver = new ProcessorTopologyTestDriver(config, topology);
+
+        driver.process(INPUT_TOPIC_1, K1, 0, STRING_SERDE.serializer(), Serdes.Integer().serializer());
+        driver.process(INPUT_TOPIC_1, K1, 1, STRING_SERDE.serializer(), Serdes.Integer().serializer());
+        driver.process(INPUT_TOPIC_1, K1, 2, STRING_SERDE.serializer(), Serdes.Integer().serializer());
+        driver.process(INPUT_TOPIC_1, K1, 3, STRING_SERDE.serializer(), Serdes.Integer().serializer());
+        driver.process(INPUT_TOPIC_2, K1, 6, STRING_SERDE.serializer(), Serdes.Integer().serializer());
+        driver.process(INPUT_TOPIC_2, K1, 10, STRING_SERDE.serializer(), Serdes.Integer().serializer());
+
+        // JSON values are de-serialized as double
+        List<ProducerRecord<String, Sequence<String, Double>>> results = new ArrayList<>();
+
+        ProducerRecord<String, Sequence<String, Double>> record;
+        do {
+            record = driver.readOutput(OUTPUT_TOPIC_1, STRING_SERDE.deserializer(), new JsonSequenceSerde.SequenceDeserializer<>());
+            if (record != null) {
+                results.add(record);
+            }
+        } while (record != null);
+
+        results.forEach(System.out::println);
+        Assert.assertEquals(2, results.size());
+
+        final ProducerRecord<String, Sequence<String, Double>> first = results.get(0);
+        Assert.assertEquals(K1, first.key());
+        assertStagesNames(first.value(), STAGE_1, STAGE_2, STAGE_3);
+        assertStagesValue(first.value(), STAGE_1, 0.0);
+        assertStagesTopic(first.value(), STAGE_1, INPUT_TOPIC_1);
+        assertStagesValue(first.value(), STAGE_2, 1.0, 2.0, 3.0);
+        assertStagesTopic(first.value(), STAGE_2, INPUT_TOPIC_1, INPUT_TOPIC_1, INPUT_TOPIC_1);
+        assertStagesValue(first.value(), STAGE_3, 6.0);
+        assertStagesTopic(first.value(), STAGE_3, INPUT_TOPIC_2);
+
+        final ProducerRecord<String, Sequence<String, Double>> second = results.get(1);
+        Assert.assertEquals(K1, second.key());
+        assertStagesNames(second.value(), STAGE_1, STAGE_2, STAGE_3);
+        assertStagesValue(second.value(), STAGE_1, 0.0);
+        assertStagesTopic(second.value(), STAGE_1, INPUT_TOPIC_1);
+        assertStagesValue(second.value(), STAGE_2, 1.0, 2.0, 3.0);
+        assertStagesTopic(second.value(), STAGE_2, INPUT_TOPIC_1, INPUT_TOPIC_1, INPUT_TOPIC_1);
+        assertStagesValue(second.value(), STAGE_3, 10.0);
+        assertStagesTopic(second.value(), STAGE_3, INPUT_TOPIC_2);
+
+        driver.close();
+    }
+
     private <K, V> void assertStagesNames(Sequence<K, V> sequence, String...stages) {
         List<String> expected = Arrays.asList(stages);
         for (int i = 0; i < expected.size(); i++) {
@@ -161,6 +243,15 @@ public class CEPStreamIntegrationTest {
         List<Event<K, V>> events = new ArrayList<>(staged.getEvents());
         for (int i = 0; i < expected.size(); i++) {
             Assert.assertEquals(expected.get(i).toString(), events.get(i).value().toString());
+        }
+    }
+
+    private <K, V> void assertStagesTopic(Sequence<K, V> sequence, String stage, String...topics) {
+        List<String> expected = Arrays.asList(topics);
+        Sequence.Staged<K, V> staged = sequence.getByName(stage);
+        List<Event<K, V>> events = new ArrayList<>(staged.getEvents());
+        for (int i = 0; i < expected.size(); i++) {
+            Assert.assertEquals(expected.get(i), events.get(i).topic());
         }
     }
 }
