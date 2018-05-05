@@ -58,17 +58,17 @@ public class SelectBuilder<K, V> {
     }
 
     public PredicateBuilder<K, V> where(final SimpleMatcher<K, V> predicate) {
-        this.pattern.addPredicate(predicate);
+        this.pattern.andPredicate(predicate);
         return new PredicateBuilder<>(this.pattern);
     }
 
     public PredicateBuilder<K, V> where(final StatefulMatcher<K, V> predicate) {
-        this.pattern.addPredicate(predicate);
+        this.pattern.andPredicate(predicate);
         return new PredicateBuilder<>(this.pattern);
     }
 
     public PredicateBuilder<K, V> where(final SequenceMatcher<K, V> predicate) {
-        this.pattern.addPredicate(predicate);
+        this.pattern.andPredicate(predicate);
         return new PredicateBuilder<>(this.pattern);
     }
 

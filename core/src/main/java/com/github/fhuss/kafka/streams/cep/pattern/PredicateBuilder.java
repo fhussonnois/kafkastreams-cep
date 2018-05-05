@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 public class PredicateBuilder<K, V> {
 
-    private Pattern<K, V> pattern;
+    private final Pattern<K, V> pattern;
 
     /**
      * Creates a  new {@link PredicateBuilder} instance.
@@ -32,17 +32,32 @@ public class PredicateBuilder<K, V> {
     }
 
     public PredicateBuilder<K, V> and(final SimpleMatcher<K, V> predicate) {
-        this.pattern.addPredicate(predicate);
+        this.pattern.andPredicate(predicate);
         return this;
     }
 
     public PredicateBuilder<K, V> and(final StatefulMatcher<K, V> predicate) {
-        this.pattern.addPredicate(predicate);
+        this.pattern.andPredicate(predicate);
         return this;
     }
 
     public PredicateBuilder<K, V> and(final SequenceMatcher<K, V> predicate) {
-        this.pattern.addPredicate(predicate);
+        this.pattern.andPredicate(predicate);
+        return this;
+    }
+
+    public PredicateBuilder<K, V> or(final SimpleMatcher<K, V> predicate) {
+        this.pattern.orPredicate(predicate);
+        return this;
+    }
+
+    public PredicateBuilder<K, V> or(final StatefulMatcher<K, V> predicate) {
+        this.pattern.orPredicate(predicate);
+        return this;
+    }
+
+    public PredicateBuilder<K, V> or(final SequenceMatcher<K, V> predicate) {
+        this.pattern.orPredicate(predicate);
         return this;
     }
 

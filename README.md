@@ -143,7 +143,7 @@ QueryBuilder<String, Integer> builder = new QueryBuilder<>();
 <pre lang="java">
 builder.where(new SimpleMatcher<String, String>() {
     @Override
-    public boolean matches(Event<String, Integer> event) {
+    public boolean matches(Event<String, String> event) {
            return event.value().equals("A");
     }
 });
@@ -192,7 +192,17 @@ builder.fold("amount", new Aggregator<String, Integer, Integer>() {
         <td class="desc">Combines two simple patterns in a stage with a logical operator AND.</td>
         <td>
 <pre lang="java">
-builder.where( (event) -> event.value > 0).and((event) -> event.value < 10)    
+builder.where( (event) -> event.value() > 0).and((event) -> event.value() < 10)    
+</pre>
+        </td>
+    </tr>
+    </tr>
+    <tr>
+        <td><pre lang="java">or(Matcher)</pre></td>
+        <td class="desc">Combines two simple patterns in a stage with a logical operator OR.</td>
+        <td>
+<pre lang="java">
+builder.where( (event) -> event.value().equals("A")).or((event) -> event.value().equals("B")))    
 </pre>
         </td>
     </tr>

@@ -145,11 +145,18 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
         this.windowUnit = unit;
     }
 
-    void addPredicate(final Matcher<K, V> predicate) {
+    void andPredicate(final Matcher<K, V> predicate) {
         if (this.predicate == null)
             this.predicate = predicate;
         else
             this.predicate = Matcher.and(this.predicate, predicate);
+    }
+
+    void orPredicate(final Matcher<K, V> predicate) {
+        if (this.predicate == null)
+            this.predicate = predicate;
+        else
+            this.predicate = Matcher.or(this.predicate, predicate);
     }
 
     void setCardinality(final Cardinality cardinality) {
