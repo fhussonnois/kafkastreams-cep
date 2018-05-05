@@ -16,6 +16,7 @@
  */
 package com.github.fhuss.kafka.streams.cep.pattern;
 
+import com.github.fhuss.kafka.streams.cep.TestMatcher;
 import com.github.fhuss.kafka.streams.cep.nfa.EdgeOperation;
 import com.github.fhuss.kafka.streams.cep.nfa.Stage;
 import org.junit.Assert;
@@ -32,7 +33,7 @@ public class StagesFactoryTest {
     @Test
     public void testPatternWithSingleStage() {
         Pattern<String, Integer> pattern = new QueryBuilder<String, Integer>()
-                .select(STAGE_1).where((event, store) -> event.value() == 0).build();
+                .select(STAGE_1).where(TestMatcher.isEqualTo(0)).build();
 
         StagesFactory<String, Integer> factory = new StagesFactory<>();
         List<Stage<String, Integer>> stages = factory.make(pattern);
@@ -55,11 +56,11 @@ public class StagesFactoryTest {
     @Test
     public void testPatternWithMultipleStages() {
         Pattern<String, Integer> pattern = new QueryBuilder<String, Integer>()
-                .select(STAGE_1).where((event, store) -> event.value() == 0)
+                .select(STAGE_1).where(TestMatcher.isEqualTo(0))
                 .then()
-                .select(STAGE_2).where((event, store) -> event.value() % 2 == 0)
+                .select(STAGE_2).where((event) -> event.value() % 2 == 0)
                 .then()
-                .select(STAGE_3).where((event, store) -> event.value() > 100)
+                .select(STAGE_3).where(TestMatcher.isGreaterThan(100))
                 .build();
 
         StagesFactory<String, Integer> factory = new StagesFactory<>();
@@ -81,11 +82,11 @@ public class StagesFactoryTest {
     @Test
     public void testPatternWithMultipleStagesAndOneOrMore() {
         Pattern<String, Integer> pattern = new QueryBuilder<String, Integer>()
-                .select(STAGE_1).where((event, store) -> event.value() == 0)
+                .select(STAGE_1).where((event) -> event.value() == 0)
                 .then()
-                .select(STAGE_2).oneOrMore().where((event, store) -> event.value() % 2 == 0)
+                .select(STAGE_2).oneOrMore().where((event) -> event.value() % 2 == 0)
                 .then()
-                .select(STAGE_3).where((event, store) -> event.value() > 100)
+                .select(STAGE_3).where((event) -> event.value() > 100)
                 .build();
 
         StagesFactory<String, Integer> factory = new StagesFactory<>();

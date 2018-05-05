@@ -18,6 +18,7 @@ package com.github.fhuss.kafka.streams.cep;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.ListIterator;
@@ -26,7 +27,7 @@ import java.util.Objects;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-public class Sequence<K, V> {
+public class Sequence<K, V> implements Iterable<Event<K, V>> {
 
     private Collection<Staged<K, V>> matched;
 
@@ -87,6 +88,15 @@ public class Sequence<K, V> {
     @Override
     public String toString() {
         return matched.toString();
+    }
+
+    @Override
+    public Iterator<Event<K, V>> iterator() {
+        LinkedList<Event<K, V>> l = new LinkedList<>();
+        for (Staged<K, V> staged : matched) {
+            l.addAll(staged.events);
+        }
+        return l.iterator();
     }
 
     public static class Staged<K, V> {

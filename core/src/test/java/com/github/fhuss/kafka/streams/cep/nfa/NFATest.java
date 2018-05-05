@@ -18,6 +18,7 @@ package com.github.fhuss.kafka.streams.cep.nfa;
 
 import com.github.fhuss.kafka.streams.cep.Event;
 import com.github.fhuss.kafka.streams.cep.Sequence;
+import com.github.fhuss.kafka.streams.cep.TestMatcher;
 import com.github.fhuss.kafka.streams.cep.pattern.Selected;
 import com.github.fhuss.kafka.streams.cep.pattern.StagesFactory;
 import com.github.fhuss.kafka.streams.cep.state.SharedVersionedBufferStore;
@@ -31,12 +32,15 @@ import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.state.internals.InMemoryKeyValueStore;
 import org.apache.kafka.test.NoOpProcessorContext;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.StreamSupport;
 
 import static org.junit.Assert.assertEquals;
 
@@ -47,7 +51,111 @@ public class NFATest {
     private Event<String, String> ev3 = new Event<>("ev3", "C", System.currentTimeMillis(), "test", 0, 2);
     private Event<String, String> ev4 = new Event<>("ev4", "C", System.currentTimeMillis(), "test", 0, 3);
     private Event<String, String> ev5 = new Event<>("ev5", "D", System.currentTimeMillis(), "test", 0, 4);
+
     private Event<String, String> ev6 = new Event<>("ev6", "D", System.currentTimeMillis(), "test", 0, 5);
+
+    private AtomicInteger offset;
+
+    @Before
+    public void before() {
+        this.offset = new AtomicInteger();
+    }
+
+    @Test
+    public void testNFAGivenStatefulCondition() {
+        Pattern<String, Integer> pattern = new QueryBuilder<String, Integer>()
+                .select("first")
+                    .where(TestMatcher.isGreaterThan(0))
+                    .fold("sum", (key, value, state) -> value)
+                    .fold("count", (key, value, state) -> 1)
+                .then()
+                    .select("second")
+                    .oneOrMore()
+                    .where((event, states) -> {
+                        double average =(int)states.get("sum") / (int)states.get("count");
+                        return average >= event.value();
+                    })
+                    .<Integer>fold("sum", (key, value, state) -> state + value)
+                    .<Integer>fold("count", (key, value, state) -> state + 1)
+                .then()
+                    .select("latest")
+                    .where((event, states) -> {
+                        double average = (int)states.get("sum") / (int)states.get("count");
+                        return average < event.value();
+                    })
+                    .<Integer>fold("sum", (key, value, state) -> state)
+                    .<Integer>fold("count", (key, value, state) -> state)
+                .build();
+
+        final NFA<String, Integer> nfa = newNFA(pattern, Serdes.String(), Serdes.Integer());
+
+        Event<String, Integer> e1 = nextEvent("t1", "key", 5);
+        Event<String, Integer> e2 = nextEvent("t1", "key", 3);
+        Event<String, Integer> e3 = nextEvent("t1", "key", 4);
+        Event<String, Integer> e4 = nextEvent("t1", "key", 10);
+        List<Sequence<String, Integer>> s = simulate(nfa, e1, e2, e3, e4);
+
+        assertEquals(1, s.size());
+
+        //assertNFA(nfa, 2, 1);
+
+        Sequence<String, Integer> expected =  Sequence.<String, Integer>newBuilder()
+                .add("latest", e4)
+                .add("second", e3)
+                .add("second", e2)
+                .add("first", e1)
+                .build(true);
+
+        assertEquals(expected, s.get(0));
+    }
+
+    @Test
+    public void testNFAGivenSequenceCondition() {
+        Pattern<String, Integer> pattern = new QueryBuilder<String, Integer>()
+                .select("first")
+                    .where(TestMatcher.isGreaterThan(0))
+                    .then()
+                .select("second")
+                    .oneOrMore()
+                    .where((event, sequence, states) ->  {
+                        double average = StreamSupport.stream(sequence.spliterator(), false)
+                                .mapToInt(Event::value)
+                                .summaryStatistics()
+                                .getAverage();
+                        return average >= event.value();
+                    })
+                    .then()
+                .select("latest")
+                    .where((event, sequence, states) ->  {
+                        double average = StreamSupport.stream(sequence.spliterator(), false)
+                                .mapToInt(Event::value)
+                                .summaryStatistics()
+                                .getAverage();
+                        return average < event.value();
+                    })
+                .build();
+
+        final NFA<String, Integer> nfa = newNFA(pattern, Serdes.String(), Serdes.Integer());
+
+        Event<String, Integer> e1 = nextEvent("t1", "key", 5);
+        Event<String, Integer> e2 = nextEvent("t1", "key", 3);
+        Event<String, Integer> e3 = nextEvent("t1", "key", 4);
+        Event<String, Integer> e4 = nextEvent("t1", "key", 10);
+        List<Sequence<String, Integer>> s = simulate(nfa, e1, e2, e3, e4);
+
+        assertEquals(1, s.size());
+
+        //assertNFA(nfa, 2, 1);
+
+        Sequence<String, Integer> expected =  Sequence.<String, Integer>newBuilder()
+                .add("latest", e4)
+                .add("second", e3)
+                .add("second", e2)
+                .add("first", e1)
+                .build(true);
+
+        assertEquals(expected, s.get(0));
+    }
 
     /**
      * Pattern : (A;B;C) / Events : A1, B2, C3
@@ -60,13 +168,13 @@ public class NFATest {
 
         Pattern<String, String> pattern = new QueryBuilder<String, String>()
                 .select("first")
-                    .where((event, store) -> event.value().equals("A"))
+                    .where(TestMatcher.isEqualTo("A"))
                 .then()
                 .select("second")
-                    .where((event, store) -> event.value().equals("B"))
+                    .where(TestMatcher.isEqualTo("B"))
                 .then()
                 .select("latest")
-                    .where((event, store) -> event.value().equals("C"))
+                    .where(TestMatcher.isEqualTo("C"))
                 .build();
 
         final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
@@ -95,17 +203,17 @@ public class NFATest {
     public void testNFAGivenOneRunAndMultipleMatch() {
         Pattern<String, String> pattern = new QueryBuilder<String, String>()
                 .select("firstStage")
-                    .where((event, store) -> event.value().equals("A"))
+                    .where(TestMatcher.isEqualTo("A"))
                     .then()
                 .select("secondStage")
-                    .where((event, store) -> event.value().equals("B"))
+                    .where(TestMatcher.isEqualTo("B"))
                     .then()
                 .select("thirdStage")
                     .oneOrMore()
-                    .where((event, store) -> event.value().equals("C"))
+                    .where(TestMatcher.isEqualTo("C"))
                     .then()
                 .select("latestState")
-                    .where((event, store) -> event.value().equals("D"))
+                    .where(TestMatcher.isEqualTo("D"))
                     .build();
 
         final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
@@ -137,13 +245,13 @@ public class NFATest {
 
         Pattern<String, String> pattern = new QueryBuilder<String, String>()
                 .select("first")
-                    .where((event, store) -> event.value().equals("A"))
+                    .where(TestMatcher.isEqualTo("A"))
                 .then()
                 .select("second", Selected.withSkipTilNextMatch())
-                    .where((event, store) -> event.value().equals("C"))
+                    .where(TestMatcher.isEqualTo("C"))
                 .then()
                 .select("latest", Selected.withSkipTilNextMatch())
-                    .where((event, store) -> event.value().equals("D"))
+                    .where(TestMatcher.isEqualTo("D"))
                 .build();
 
         final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
@@ -171,14 +279,14 @@ public class NFATest {
 
         Pattern<String, String> pattern = new QueryBuilder<String, String>()
                 .select("first")
-                    .where((event, store) -> event.value().equals("A"))
+                    .where(TestMatcher.isEqualTo("A"))
                 .then()
                 .select("second", Selected.withSkipTilNextMatch())
                     .oneOrMore()
-                    .where((event, store) -> event.value().equals("C"))
+                    .where(TestMatcher.isEqualTo("C"))
                 .then()
                 .select("latest", Selected.withSkipTilNextMatch())
-                    .where((event, store) -> event.value().equals("D"))
+                    .where(TestMatcher.isEqualTo("D"))
                 .build();
 
         final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
@@ -198,6 +306,54 @@ public class NFATest {
     /**
      * Pattern : (A;C;D) / Events : A1, B2, C3, C4, D5
      *
+     * R1: A1, C3, D5 (matched)
+     * R2: _
+     * R3: A1, C4, D5 (matched)
+     * R4: A1, _, _ , _
+     * R5: A1, C3, _
+     * R6: A1, C4, _
+     */
+    @Test
+    public void testNFAGivenTwoConsecutiveSkipTillAnyMatch() {
+
+        Pattern<String, String> pattern = new QueryBuilder<String, String>()
+                .select("first")
+                .where(TestMatcher.isEqualTo("A"))
+                .then()
+                .select("second", Selected.withSkipTilAnyMatch())
+                .where(TestMatcher.isEqualTo("C"))
+                .then()
+                .select("latest", Selected.withSkipTilAnyMatch())
+                .where(TestMatcher.isEqualTo("D"))
+                .build();
+
+        final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
+
+        List<Sequence<String, String>> s = simulate(nfa, ev1, ev2, ev3, ev4, ev5);
+
+        assertNFA(nfa, 6, 4);
+
+        assertEquals(2, s.size());
+        Sequence<String, String> expected = Sequence.<String, String>newBuilder()
+                .add("first", ev1)
+                .add("second", ev3)
+                .add("latest", ev5)
+                .build(false);
+
+        assertEquals(expected, s.get(0));
+
+        Sequence<String, String> expected2 = Sequence.<String, String>newBuilder()
+                .add("first", ev1)
+                .add("second", ev4)
+                .add("latest", ev5)
+                .build(false);
+
+        assertEquals(expected2, s.get(1));
+    }
+
+    /**
+     * Pattern : (A;C;D) / Events : A1, B2, C3, C4, D5
+     *
      * R1: A1, C3, C4, D5 (matched)
      * R2: _
      * R3: A1, C4, D5 (matched)
@@ -209,14 +365,14 @@ public class NFATest {
 
         Pattern<String, String> pattern = new QueryBuilder<String, String>()
                 .select("first")
-                .where((event, store) -> event.value().equals("A"))
+                .where(TestMatcher.isEqualTo("A"))
                 .then()
                 .select("second", Selected.withSkipTilAnyMatch())
                 .oneOrMore()
-                .where((event, store) -> event.value().equals("C"))
+                .where(TestMatcher.isEqualTo("C"))
                 .then()
                 .select("latest")
-                .where((event, store) -> event.value().equals("D"))
+                .where(TestMatcher.isEqualTo("D"))
                 .build();
 
         final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
@@ -267,16 +423,16 @@ public class NFATest {
 
         Pattern<String, String> pattern = new QueryBuilder<String, String>()
                 .select("first")
-                .where((event, store) -> event.value().equals("A"))
+                .where(TestMatcher.isEqualTo("A"))
                 .then()
                 .select("second")
-                .where((event, store) -> event.value().equals("B"))
+                .where(TestMatcher.isEqualTo("B"))
                 .then()
                 .select("three", Selected.withSkipTilAnyMatch())
-                .where((event, store) -> event.value().equals("C"))
+                .where(TestMatcher.isEqualTo("C"))
                 .then()
                 .select("latest", Selected.withSkipTilAnyMatch())
-                .where((event, store) -> event.value().equals("D"))
+                .where(TestMatcher.isEqualTo("D"))
                 .build();
 
         final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
@@ -315,16 +471,16 @@ public class NFATest {
 
         Pattern<String, String> pattern = new QueryBuilder<String, String>()
                 .select("first")
-                    .where((event, store) -> event.value().equals("A"))
+                    .where(TestMatcher.isEqualTo("A"))
                 .then()
                 .select("second")
-                    .where((event, store) -> event.value().equals("B"))
+                    .where(TestMatcher.isEqualTo("B"))
                 .then()
                 .select("three", Selected.withSkipTilAnyMatch())
-                    .where((event, store) -> event.value().equals("C"))
+                    .where(TestMatcher.isEqualTo("C"))
                 .then()
                 .select("latest", Selected.withSkipTilNextMatch())
-                    .where((event, store) -> event.value().equals("D"))
+                    .where(TestMatcher.isEqualTo("D"))
                 .build();
 
         final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
@@ -364,16 +520,16 @@ public class NFATest {
 
         Pattern<String, String> pattern = new QueryBuilder<String, String>()
                 .select("first")
-                .where((event, store) -> event.value().equals("A"))
+                .where(TestMatcher.isEqualTo("A"))
                 .then()
                 .select("second")
-                .where((event, store) -> event.value().equals("B"))
+                .where(TestMatcher.isEqualTo("B"))
                 .then()
                 .select("three")
-                .where((event, store) -> event.value().equals("C"))
+                .where(TestMatcher.isEqualTo("C"))
                 .then()
                 .select("latest", Selected.withSkipTilAnyMatch())
-                .where((event, store) -> event.value().equals("D"))
+                .where(TestMatcher.isEqualTo("D"))
                 .build();
 
         final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
@@ -443,5 +599,13 @@ public class NFATest {
         aggStore.init(new NoOpProcessorContext(), null);
 
         return new NFA<>(aggStore, bufferStore, stages);
+    }
+
+    private <K, V> Event<K, V> nextEvent(String topic, int partition, K key, V value) {
+        return new Event<>(key, value, System.currentTimeMillis(), topic, partition, offset.getAndIncrement());
+    }
+
+    private <K, V> Event<K, V> nextEvent(String topic, K key, V value) {
+        return nextEvent(topic, 0, key, value);
     }
 }

@@ -16,6 +16,7 @@
  */
 package com.github.fhuss.kafka.streams.cep.state.internal;
 
+import com.github.fhuss.kafka.streams.cep.Event;
 import com.github.fhuss.kafka.streams.cep.nfa.Stage;
 import org.apache.commons.lang3.builder.CompareToBuilder;
 
@@ -58,6 +59,10 @@ public class Matched implements Serializable, Comparable<Matched>{
         this.topic = topic;
         this.partition = partition;
         this.offset = offset;
+    }
+
+    public static <K, V> Matched from(final Stage<K, V> stage, final Event<K, V> event) {
+        return new Matched(stage.getName(), stage.getType(), event.topic(), event.partition(), event.offset());
     }
 
     public String getStageName() {

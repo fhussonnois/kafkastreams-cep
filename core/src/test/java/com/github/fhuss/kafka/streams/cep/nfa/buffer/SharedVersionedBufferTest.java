@@ -21,6 +21,7 @@ import com.github.fhuss.kafka.streams.cep.nfa.DeweyVersion;
 import com.github.fhuss.kafka.streams.cep.nfa.Stage;
 import com.github.fhuss.kafka.streams.cep.state.SharedVersionedBufferStore;
 import com.github.fhuss.kafka.streams.cep.Event;
+import com.github.fhuss.kafka.streams.cep.state.internal.Matched;
 import com.github.fhuss.kafka.streams.cep.state.internal.SharedVersionedBufferStoreImpl;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
@@ -52,7 +53,7 @@ public class SharedVersionedBufferTest {
         buffer.put(second, ev2, first, ev1, new DeweyVersion("1.0"));
         buffer.put(latest, ev3, second, ev2, new DeweyVersion("1.0.0"));
 
-        Sequence<String, String> sequence = buffer.get(latest, ev3, new DeweyVersion("1.0.0"));
+        Sequence<String, String> sequence = buffer.get(Matched.from(latest, ev3), new DeweyVersion("1.0.0"));
         assertNotNull(sequence);
         assertEquals(3, sequence.size());
         assertEquals(sequence.getByName("latest").getEvents().iterator().next(), ev3);
@@ -70,14 +71,14 @@ public class SharedVersionedBufferTest {
         buffer.put(second, ev4, second, ev3, new DeweyVersion("1.1"));
         buffer.put(latest, ev5, second, ev4, new DeweyVersion("1.1.0"));
 
-        Sequence<String, String> sequence1 = buffer.get(latest, ev3, new DeweyVersion("1.0.0"));
+        Sequence<String, String> sequence1 = buffer.get(Matched.from(latest, ev3), new DeweyVersion("1.0.0"));
         assertNotNull(sequence1);
         assertEquals(3, sequence1.size());
         assertEquals(sequence1.getByName("latest").getEvents().iterator().next(), ev3);
         assertEquals(sequence1.getByName("second").getEvents().iterator().next(), ev2);
         assertEquals(sequence1.getByName("first").getEvents().iterator().next(), ev1);
 
-        Sequence<String, String> sequence2 = buffer.get(latest, ev5, new DeweyVersion("1.1.0"));
+        Sequence<String, String> sequence2 = buffer.get(Matched.from(latest, ev5), new DeweyVersion("1.1.0"));
         assertNotNull(sequence2);
         assertEquals(5, sequence2.size());
         assertEquals(1, sequence2.getByName("latest").getEvents().size());

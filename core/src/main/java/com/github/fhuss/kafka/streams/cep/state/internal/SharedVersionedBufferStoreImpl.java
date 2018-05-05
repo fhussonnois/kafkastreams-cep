@@ -98,8 +98,9 @@ public class SharedVersionedBufferStoreImpl<K , V>  extends WrappedStateStore.Ab
                     final Stage<K, V> prevStage,
                     final Event<K, V> prevEvent,
                     final DeweyVersion version) {
-        Matched prevEventKey = new Matched(prevStage.getName(), prevStage.getType(), prevEvent.topic(), prevEvent.partition(), prevEvent.offset());
-        Matched currEventKey = new Matched(currStage.getName(), currStage.getType(), currEvent.topic(), currEvent.partition(), currEvent.offset());
+
+        Matched prevEventKey = Matched.from(prevStage, prevEvent);
+        Matched currEventKey = Matched.from(currStage, currEvent);
 
         byte[] prevBytes = this.bytesStore.get(Bytes.wrap(serdes.rawKey(prevEventKey)));
         MatchedEvent sharedPrevEvent = serdes.valueFrom(prevBytes);
@@ -119,8 +120,12 @@ public class SharedVersionedBufferStoreImpl<K , V>  extends WrappedStateStore.Ab
         this.bytesStore.put(Bytes.wrap(serdes.rawKey(currEventKey)), serdes.rawValue(sharedCurrEvent));
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public void branch(final Stage<K, V> stage, final Event<K, V> event, final DeweyVersion version) {
-        Matched key = newStackEventKey(stage, event);
+        Matched key = Matched.from(stage, event);
         MatchedEvent.Pointer pointer = new MatchedEvent.Pointer(version, key);
         while(pointer != null && (key = pointer.getKey()) != null) {
             byte[] bytes = this.bytesStore.get(Bytes.wrap(serdes.rawKey(key)));
@@ -151,47 +156,43 @@ public class SharedVersionedBufferStoreImpl<K , V>  extends WrappedStateStore.Ab
      */
     @SuppressWarnings("unchecked")
     @Override
-    public Sequence<K, V> get(final Stage<K, V> stage, final Event<K, V> event, final DeweyVersion version) {
-        return peek(stage, event, version, false);
+    public Sequence<K, V> get(final Matched matched, final DeweyVersion version) {
+        return peek(matched, version, false);
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public Sequence<K, V> remove(final Stage<K, V> stage, final Event<K, V> event, final DeweyVersion version) {
-        return peek(stage, event, version, true);
+    public Sequence<K, V> remove(final Matched matched, final DeweyVersion version) {
+        return peek(matched, version, true);
     }
 
-    private Sequence<K, V> peek(Stage<K, V> stage, Event<K, V> event, DeweyVersion version, boolean remove) {
-        MatchedEvent.Pointer pointer = new MatchedEvent.Pointer(version, newStackEventKey(stage, event));
+    private Sequence<K, V> peek(final Matched matched, DeweyVersion version, boolean remove) {
+        MatchedEvent.Pointer pointer = new MatchedEvent.Pointer(version, matched);
 
         Sequence.Builder<K, V> builder = new Sequence.Builder<>();
 
         while (pointer != null && pointer.getKey() != null) {
-            final Matched matched = pointer.getKey();
-            byte[] bytes = this.bytesStore.get(Bytes.wrap(serdes.rawKey(matched)));
+            final Matched key = pointer.getKey();
+            byte[] bytes = this.bytesStore.get(Bytes.wrap(serdes.rawKey(key)));
             final MatchedEvent<K, V> stateValue = serdes.valueFrom(bytes);
 
             long refsLeft = stateValue.decrementRefAndGet();
             if (remove && refsLeft == 0 && stateValue.getPredecessors().size() <= 1) {
-                this.bytesStore.delete(Bytes.wrap(serdes.rawKey(matched)));
+                this.bytesStore.delete(Bytes.wrap(serdes.rawKey(key)));
             }
 
-            builder.add(matched.getStageName(), newEvent(matched, stateValue));
+            builder.add(key.getStageName(), newEvent(key, stateValue));
             pointer = stateValue.getPointerByVersion(pointer.getVersion());
 
             if (remove && pointer != null && refsLeft == 0) {
                 stateValue.removePredecessor(pointer);
-                this.bytesStore.put(Bytes.wrap(serdes.rawKey(matched)), serdes.rawValue(stateValue));
+                this.bytesStore.put(Bytes.wrap(serdes.rawKey(key)), serdes.rawValue(stateValue));
 
             }
         }
         return builder.build(true);
-    }
-
-    private Matched newStackEventKey(final Stage<K, V> stage, final Event<K, V> event) {
-        return new Matched(stage.getName(), stage.getType(), event.topic(), event.partition(), event.offset());
     }
 
     private Event<K, V> newEvent(final Matched stateKey, final MatchedEvent<K, V> stateValue) {

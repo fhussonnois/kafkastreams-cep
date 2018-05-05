@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -27,16 +27,26 @@ public class PredicateBuilder<K, V> {
      * Creates a  new {@link PredicateBuilder} instance.
      * @param pattern
      */
-    public PredicateBuilder(Pattern<K, V> pattern) {
+    PredicateBuilder(final Pattern<K, V> pattern) {
         this.pattern = pattern;
     }
 
-    public PredicateBuilder<K, V> and(Matcher<K, V> predicate) {
+    public PredicateBuilder<K, V> and(final SimpleMatcher<K, V> predicate) {
         this.pattern.addPredicate(predicate);
         return this;
     }
 
-    public <T> PredicateBuilder<K, V> fold(String state, Aggregator<K, V, T> aggregator) {
+    public PredicateBuilder<K, V> and(final StatefulMatcher<K, V> predicate) {
+        this.pattern.addPredicate(predicate);
+        return this;
+    }
+
+    public PredicateBuilder<K, V> and(final SequenceMatcher<K, V> predicate) {
+        this.pattern.addPredicate(predicate);
+        return this;
+    }
+
+    public <T> PredicateBuilder<K, V> fold(final String state, final Aggregator<K, V, T> aggregator) {
         this.pattern.addStateAggregator(new StateAggregator<>(state, aggregator));
         return this;
     }

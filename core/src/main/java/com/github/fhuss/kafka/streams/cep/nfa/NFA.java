@@ -18,13 +18,17 @@ package com.github.fhuss.kafka.streams.cep.nfa;
 
 import com.github.fhuss.kafka.streams.cep.Event;
 import com.github.fhuss.kafka.streams.cep.Sequence;
+import com.github.fhuss.kafka.streams.cep.pattern.MatcherContext;
+import com.github.fhuss.kafka.streams.cep.state.ReadOnlySharedVersionBuffer;
 import com.github.fhuss.kafka.streams.cep.state.SharedVersionedBufferStore;
 import com.github.fhuss.kafka.streams.cep.state.States;
 import com.github.fhuss.kafka.streams.cep.pattern.StateAggregator;
 import com.github.fhuss.kafka.streams.cep.state.internal.Aggregate;
 import com.github.fhuss.kafka.streams.cep.state.internal.Aggregated;
 import com.github.fhuss.kafka.streams.cep.state.AggregatesStore;
+import com.github.fhuss.kafka.streams.cep.state.internal.Matched;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -40,12 +44,15 @@ import java.util.stream.Collectors;
 /**
  * Non-determinism Finite Automaton.
  *
- * @param <K>
- * @param <V>
+ * The implementation is based on the paper "Efficient Pattern Matching over Event Streams".
+ * @see <a href="https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf">https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf</a>
+ *
+ * @param <K>   the record key type.
+ * @param <V>   the record value type.
  */
 public class NFA<K, V> implements Serializable {
 
-    private static final Logger LOG = org.slf4j.LoggerFactory.getLogger(NFA.class);
+    private static final Logger LOG = LoggerFactory.getLogger(NFA.class);
 
     private static final long INITIAL_RUNS = 1L;
 
@@ -53,7 +60,7 @@ public class NFA<K, V> implements Serializable {
 
     private Queue<ComputationStage<K, V>> computationStages;
 
-    private final AggregatesStore<K> states;
+    private final AggregatesStore<K> aggregatesStore;
 
     private AtomicLong runs;
 
@@ -69,14 +76,14 @@ public class NFA<K, V> implements Serializable {
     /**
      * Creates a new {@link NFA} instance.
      */
-    public NFA(final AggregatesStore states,
+    public NFA(final AggregatesStore aggregatesStore,
                final SharedVersionedBufferStore<K, V> buffer,
                final Long runs,
                final Queue<ComputationStage<K, V>> computationStages) {
         this.sharedVersionedBuffer = buffer;
         this.computationStages = computationStages;
         this.runs = new AtomicLong(runs);
-        this.states = states;
+        this.aggregatesStore = aggregatesStore;
     }
 
     public long getRuns() {
@@ -120,16 +127,16 @@ public class NFA<K, V> implements Serializable {
 
     private List<Sequence<K, V>> matchConstruction(final Collection<ComputationStage<K, V>> states) {
         return  states.stream()
-                .map(c -> sharedVersionedBuffer.remove(c.getStage(), c.getLastEvent(), c.getVersion()))
+                .map(c -> {
+                    Matched matched = Matched.from(c.getStage(), c.getLastEvent());
+                    return sharedVersionedBuffer.remove(matched, c.getVersion());
+                })
                 .collect(Collectors.toList());
     }
 
     private void removePattern(ComputationStage<K, V> computationStage) {
-        sharedVersionedBuffer.remove(
-                computationStage.getStage(),
-                computationStage.getLastEvent(),
-                computationStage.getVersion()
-        );
+        final Matched matched = Matched.from(computationStage.getStage(), computationStage.getLastEvent());
+        sharedVersionedBuffer.remove(matched, computationStage.getVersion());
     }
 
     private List<ComputationStage<K, V>> getAllNonFinalStates(final Collection<ComputationStage<K, V>> states) {
@@ -165,7 +172,7 @@ public class NFA<K, V> implements Serializable {
         final Event<K, V> previousEvent = computationStage.getLastEvent();
         final DeweyVersion version      = computationStage.getVersion();
 
-        List<Stage.Edge<K, V>> matchedEdges = matchEdgesAndGet(ctx.event, sequenceId, currentStage);
+        List<Stage.Edge<K, V>> matchedEdges = matchEdgesAndGet(previousEvent, ctx.event, version, sequenceId, previousStage, currentStage);
 
         Collection<ComputationStage<K, V>> nextComputationStages = new ArrayList<>();
 
@@ -271,7 +278,7 @@ public class NFA<K, V> implements Serializable {
 
                 currentStage.getAggregates().forEach(agg -> {
                     Aggregated<K> aggregated = new Aggregated<>(currentEvent.key(), new Aggregate(agg.getName(), sequenceId));
-                    states.branch(aggregated, newSequence);
+                    aggregatesStore.branch(aggregated, newSequence);
                 });
 
                 if (!previousStage.isBeginState()) {
@@ -328,17 +335,24 @@ public class NFA<K, V> implements Serializable {
     private void evaluateAggregates(List<StateAggregator<K, V, Object>> aggregates, long sequence, K key, V value) {
         aggregates.forEach(agg -> {
             Aggregated<K> aggregated = new Aggregated<>(key, new Aggregate(agg.getName(), sequence));
-            Object o = states.find(aggregated);
+            Object o = aggregatesStore.find(aggregated);
             Object newValue = agg.getAggregate().aggregate(key, value, o);
-            states.put(aggregated, newValue);
+            aggregatesStore.put(aggregated, newValue);
         });
     }
 
-    private List<Stage.Edge<K, V>> matchEdgesAndGet(Event<K, V> event, long sequence, Stage<K, V> currentStage) {
-        States<K> store = new States<>(states, event.key(), sequence);
+    private List<Stage.Edge<K, V>> matchEdgesAndGet(final Event<K, V> previousEvent,
+                                                    final Event<K, V> currentEvent,
+                                                    final DeweyVersion version,
+                                                    final long sequence,
+                                                    final Stage<K, V> previousStage,
+                                                    final Stage<K, V> currentStage) {
+
+        States<K> states = new States<>(aggregatesStore, currentEvent.key(), sequence);
+        ReadOnlySharedVersionBuffer<K, V> readOnlySharedVersionBuffer = new ReadOnlySharedVersionBuffer<>(sharedVersionedBuffer);
         return currentStage.getEdges()
                 .stream()
-                .filter(e -> e.matches(event, store))
+                .filter(e -> e.accept(new MatcherContext<>(readOnlySharedVersionBuffer, version, previousStage, currentStage, previousEvent, currentEvent, states)))
                 .collect(Collectors.toList());
     }
 

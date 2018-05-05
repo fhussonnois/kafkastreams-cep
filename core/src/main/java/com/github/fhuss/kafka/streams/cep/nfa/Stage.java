@@ -17,6 +17,8 @@
 package com.github.fhuss.kafka.streams.cep.nfa;
 
 import com.github.fhuss.kafka.streams.cep.Event;
+import com.github.fhuss.kafka.streams.cep.pattern.MatcherContext;
+import com.github.fhuss.kafka.streams.cep.state.ReadOnlySharedVersionBuffer;
 import com.github.fhuss.kafka.streams.cep.state.States;
 import com.github.fhuss.kafka.streams.cep.pattern.Matcher;
 import com.github.fhuss.kafka.streams.cep.pattern.StateAggregator;
@@ -30,7 +32,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
+ *
+ * The implementation is based on the paper "Efficient Pattern Matching over Event Streams".
+ * @see <a href="https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf">https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf</a>
  */
 public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
 
@@ -100,11 +104,11 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
         return edges;
     }
 
-    boolean isBeginState() {
+    public boolean isBeginState() {
         return type.equals(StateType.BEGIN);
     }
 
-    boolean isFinalState() {
+    public boolean isFinalState() {
         return type.equals(StateType.FINAL);
     }
     
@@ -174,8 +178,8 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
             return operation;
         }
 
-        boolean matches(Event<K, V> event, States store) {
-            return predicate.matches(event, store);
+        boolean accept(final MatcherContext<K, V> context) {
+            return predicate.accept(context);
         }
 
         public Stage<K, V> getTarget() {

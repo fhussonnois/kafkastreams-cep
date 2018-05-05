@@ -20,12 +20,14 @@ import com.github.fhuss.kafka.streams.cep.Event;
 import com.github.fhuss.kafka.streams.cep.Sequence;
 import com.github.fhuss.kafka.streams.cep.nfa.DeweyVersion;
 import com.github.fhuss.kafka.streams.cep.nfa.Stage;
+import com.github.fhuss.kafka.streams.cep.state.internal.Matched;
 import org.apache.kafka.streams.processor.StateStore;
 
 /**
  * A buffer with a compact structure to store partial and complete matches for all runs.
  *
- * Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
+ * The implementation is based on the paper "Efficient Pattern Matching over Event Streams".
+ * @see <a href="https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf">https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf</a>
  */
 public interface SharedVersionedBufferStore<K , V> extends StateStore {
 
@@ -38,7 +40,11 @@ public interface SharedVersionedBufferStore<K , V> extends StateStore {
      * @param prevEvent the predecessor event.
      * @param version the predecessor version.
      */
-    void put(Stage<K, V> currStage, Event<K, V> currEvent, Stage<K, V> prevStage, Event<K, V> prevEvent, DeweyVersion version);
+    void put(final Stage<K, V> currStage,
+             final Event<K, V> currEvent,
+             final Stage<K, V> prevStage,
+             final Event<K, V> prevEvent,
+             final DeweyVersion version);
 
     /**
      * Adds a new event match into this shared buffer.
@@ -47,28 +53,26 @@ public interface SharedVersionedBufferStore<K , V> extends StateStore {
      * @param evt the event.
      * @param version the dewey version attached to this match.
      */
-    void put(Stage<K, V> stage, Event<K, V> evt, DeweyVersion version);
+    void put(final Stage<K, V> stage, final Event<K, V> evt, final DeweyVersion version);
 
     /**
      * Retrieves the complete event sequence for the specified final event.
      *
-     * @param stage the final state of the sequence.
-     * @param event the final event of the sequence.
+     * @param matched
      * @param version the final dewey version of the sequence.
      * @return a new {@link Sequence} instance.
      */
-    Sequence<K, V> get(final Stage<K, V> stage, final Event<K, V> event, final DeweyVersion version);
+    Sequence<K, V> get(final Matched matched, final DeweyVersion version);
 
     /**
      * Remove all events attached to a sequence.
      *
-     * @param stage the final state of the sequence.
-     * @param event the final event of the sequence.
+     * @param matched the final event of the sequence.
      * @param version the final dewey version of the sequence.
      *
      * @return the previous sequence associated with state, event and version, or null if there was no sequence for that.
      */
-    Sequence<K, V> remove(final Stage<K, V> stage, final Event<K, V> event, final DeweyVersion version);
+    Sequence<K, V> remove(final Matched matched, final DeweyVersion version);
 
 
     void branch(Stage<K, V> stage, Event<K, V> event, DeweyVersion version);

@@ -17,17 +17,25 @@
 package com.github.fhuss.kafka.streams.cep.pattern;
 
 import com.github.fhuss.kafka.streams.cep.Event;
-import com.github.fhuss.kafka.streams.cep.state.States;
 
 import java.util.Objects;
 
+/**
+ * A matcher defines the condition under which an event should be selected to be added to the pattern sequence.
+ *
+ * @param <K>   the record key type.
+ * @param <V>   the record value type.
+ */
 @FunctionalInterface
 public interface Matcher<K, V> {
 
-    boolean matches(final Event<K, V> event, final States store);
+    /**
+     * The function that evaluates an input record stream.
+     */
+    boolean accept(final MatcherContext<K, V> context);
 
     static <K, V> Matcher<K, V> not(Matcher<K, V> predicate) {
-        return (event, stateStore) -> !predicate.matches(event, stateStore);
+        return new NotPredicate<>(predicate);
     }
 
     static <K, V> Matcher<K, V> or(Matcher<K, V> left, Matcher<K, V> right) {
@@ -38,9 +46,23 @@ public interface Matcher<K, V> {
         return new AndPredicate<>(left, right);
     }
 
+    class NotPredicate<K, V> implements Matcher<K, V> {
+
+        private final Matcher<K, V> predicate;
+
+        NotPredicate(final Matcher<K, V> predicate) {
+            this.predicate = predicate;
+        }
+
+        @Override
+        public boolean accept(MatcherContext<K, V> context) {
+            return ! this.predicate.accept(context);
+        }
+    }
+
     class AndPredicate<K, V> implements Matcher<K, V> {
-        private Matcher<K, V> left;
-        private Matcher<K, V> right;
+        private final Matcher<K, V> left;
+        private final Matcher<K, V> right;
 
         AndPredicate(final Matcher<K, V> left, final Matcher<K, V> right) {
             this.left = left;
@@ -49,10 +71,11 @@ public interface Matcher<K, V> {
 
         /**
          * {@inheritDoc}
+         * @param context
          */
         @Override
-        public boolean matches(final Event<K, V> event, final States store) {
-            return left.matches(event, store) && right.matches(event, store);
+        public boolean accept(final MatcherContext<K, V> context) {
+            return left.accept(context) && right.accept(context);
         }
     }
 
@@ -67,14 +90,14 @@ public interface Matcher<K, V> {
 
         /**
          * {@inheritDoc}
+         * @param context
          */
         @Override
-        public boolean matches(final Event<K, V> event, final States store) {
-            return left.matches(event, store) || right.matches(event, store);
-
+        public boolean accept(final MatcherContext<K, V> context) {
+            return left.accept(context) || right.accept(context);
         }
     }
-    class TopicPredicate<K, V> implements Matcher<K, V> {
+    class TopicPredicate<K, V> implements SimpleMatcher<K, V> {
 
         private final String topic;
 
@@ -82,22 +105,23 @@ public interface Matcher<K, V> {
             Objects.requireNonNull(topic, "topic can't be null");
             this.topic = topic;
         }
+
         /**
          * {@inheritDoc}
          */
         @Override
-        public boolean matches(Event<K, V> event, States store) {
+        public boolean matches(final Event<K, V> event) {
             return event.topic().equals(topic);
         }
     }
 
-    class TruePredicate<K, V> implements Matcher<K, V> {
+    class TruePredicate<K, V> implements SimpleMatcher<K, V> {
 
         /**
          * {@inheritDoc}
          */
         @Override
-        public boolean matches(Event<K, V> event, States store) {
+        public boolean matches(Event<K, V> event) {
             return true;
         }
     }
