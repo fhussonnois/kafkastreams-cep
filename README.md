@@ -95,50 +95,45 @@ QueryBuilder<String, Integer> builder = new QueryBuilder<>();
     <thead>
     <tr>
         <th>Pattern Builder Methods </th>
-        <th class="desc">
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-        Description
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-        </th>
-        <th>Example</th>
+        <th>Description & Examples</th>
     </tr>
     </thead>
     <tbody>
     <tr>
         <td><pre lang="java">select()</pre></td>
-        <td class="desc">Defines a new simple pattern.</td>
         <td>
+            <p>Defines a new simple pattern.</p>
             <pre lang="java">select = query.select();</pre>
+            <p>Stage can be named</p>
             <pre lang="java">select = query.select("my-first-stage");</pre>
         </td>
     </tr>
     <tr>
         <td><pre lang="java">optional()</pre></td>
-        <td class="desc">Defines that this pattern is optional. i.e. that at most one event can match this pattern.</td>
         <td>
+            <p>Defines that this pattern is optional. i.e. that at most one event can match this pattern.</p>
             <pre lang="java">builder.optional()</pre>
         </td>
     </tr>
     <tr>
         <td><pre lang="java">zeroOrMore()</pre></td>
-        <td class="desc">Defines that zero or multiple events can match this pattern.</td>
         <td>
+            <p>Defines that zero or multiple events can match this pattern.</p>
             <pre lang="java">builder.zeroOrMore()</pre>
         </td>
     </tr>
     <tr>
         <td><pre lang="java">oneOrMore()</pre></td>
-        <td class="desc">Defines that at least one event should match this pattern.</td>
         <td>
+            <p>Defines that at least one event should match this pattern.</p>
             <pre lang="java">builder.oneOrMore()</pre>
         </td>
     </tr>
     <tr>
         <td><pre lang="java">where(Matcher)</pre></td>
-        <td class="desc">
-            <p>Defines the condition under which an event should be selected to be added to the pattern sequence.</p>
-            <p>Currently, three types of Matcher can be used to select a relevant event.</p> 
         <td>
+<p>Defines the condition under which an event should be selected to be added to the pattern sequence.</p>
+<p>Currently, three types of Matcher can be used to select a relevant event.</p> 
 <strong>SimpleMatcher</strong>        
 <pre lang="java">
 builder.where(new SimpleMatcher<String, String>() {
@@ -175,8 +170,10 @@ builder.where(new SequenceMatcher<String, Integer>() {
     </tr>
     <tr>
         <td><pre lang="java">fold(state, aggregator)</pre></td>
-        <td class="desc">The fold() method allows to accumulate some state between each pattern. Then the defined states can be used latter to select relevant events. <br/>The aggregator function is invoke only if the input</td>
         <td>
+<p>
+The fold() method allows to accumulate some state between each pattern. Then the defined states can be used latter to select relevant events. <br/>The aggregator function is invoke only if the input
+</p>        
 <pre lang="java">
 builder.fold("amount", new Aggregator<String, Integer, Integer>() {
     @Override
@@ -189,8 +186,8 @@ builder.fold("amount", new Aggregator<String, Integer, Integer>() {
     </tr>
     <tr>
         <td><pre lang="java">and(Matcher)</pre></td>
-        <td class="desc">Combines two simple patterns in a stage with a logical operator AND.</td>
         <td>
+        <p>Combines two simple patterns in a stage with a logical operator AND.</p>
 <pre lang="java">
 builder.where( (event) -> event.value() > 0).and((event) -> event.value() < 10)    
 </pre>
@@ -199,8 +196,8 @@ builder.where( (event) -> event.value() > 0).and((event) -> event.value() < 10)
     </tr>
     <tr>
         <td><pre lang="java">or(Matcher)</pre></td>
-        <td class="desc">Combines two simple patterns in a stage with a logical operator OR.</td>
         <td>
+        <p>Combines two simple patterns in a stage with a logical operator OR.</p>
 <pre lang="java">
 builder.where( (event) -> event.value().equals("A")).or((event) -> event.value().equals("B")))    
 </pre>
@@ -208,8 +205,8 @@ builder.where( (event) -> event.value().equals("A")).or((event) -> event.value()
     </tr>
     <tr>
         <td>within(time, TimeUnit)</td>
-        <td>Defines a time window over the entire complex pattern.</td>
         <td>
+        <p>Defines a time window over the entire complex pattern.</p>
 <pre lang="java">
 builder.within(1, TimeUnit.HOUR)
 });
