@@ -34,19 +34,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Map;
 
+/**
+ * The default {@link Processor} implementation used to run a user-defined {@link Pattern}.
+ *
+ * @param <K> the type of keys
+ * @param <V> the type of values
+ */
 public class CEPProcessor<K, V> implements Processor<K, V> {
 
     private static final Logger LOG = LoggerFactory.getLogger(CEPProcessor.class);
 
     private List<Stage<K, V>> stages;
 
-
     private ProcessorContext context;
 
     private String queryName;
-
-    private Long highwatermark = -1L;
 
     private SharedVersionedBufferStore<K, V> bufferStore;
 
@@ -54,45 +58,66 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
 
     private NFAStore<K, V> nfaStore;
 
+    private NFAStates<K, V> currentNFAState;
+
     /**
      * Creates a new {@link CEPProcessor} instance.
      *
-     * @param pattern
+     * @param queryName the complex pattern query name.
+     * @param pattern   the complex pattern.
      */
     public CEPProcessor(final String queryName,
                         final Pattern<K, V> pattern) {
-        StagesFactory<K, V> fact = new StagesFactory<>();
-        this.stages = fact.make(pattern);
+        this(queryName, new StagesFactory<K, V>().make(pattern));
+    }
+
+    /**
+     * Creates a new {@link CEPProcessor} instance.
+     *
+     * @param queryName the complex pattern query name.
+     * @param stages   the complex pattern.
+     */
+    public CEPProcessor(final String queryName,
+                        final List<Stage<K, V>> stages) {
+        this.stages = stages;
         this.queryName = queryName.toLowerCase().replace("\\s+", "");
     }
 
     @Override
     @SuppressWarnings("unchecked")
-    public void init(ProcessorContext context) {
+    public void init(final ProcessorContext context) {
         this.context = context;
 
         this.nfaStore = (NFAStore<K, V>)
                 context.getStateStore(QueryStores.getQueryNFAStoreName(queryName));
+        if (this.nfaStore == null) {
+            throw new IllegalStateException("Cannot find store with name " + QueryStores.getQueryNFAStoreName(queryName));
+        }
 
         this.bufferStore = (SharedVersionedBufferStore<K, V> )
                 context.getStateStore(QueryStores.getQueryEventBufferStoreName(queryName));
+        if (this.bufferStore == null) {
+            throw new IllegalStateException("Cannot find store with name " + QueryStores.getQueryEventBufferStoreName(queryName));
+        }
 
         this.aggregatesStore = (AggregatesStore<K>)
                 context.getStateStore(QueryStores.getQueryAggregateStatesStoreName(queryName));
+        if (this.aggregatesStore == null) {
+            throw new IllegalStateException("Cannot find store with name " + QueryStores.getQueryAggregateStatesStoreName(queryName));
+        }
     }
 
     @SuppressWarnings("unchecked")
     private NFA<K, V> loadNFA(List<Stage<K, V>> stages, K key) {
         final Runned<K> runned = getRunned(key);
-
-        NFAStates<K, V> nfaState = nfaStore.find(runned);
+        this.currentNFAState = nfaStore.find(runned);
         NFA<K, V> nfa;
-        if (nfaState != null) {
-            LOG.info("Loading existing nfa states for {}, latest offset {}", runned, nfaState.getLatestOffset());
-            nfa = new NFA<>(aggregatesStore, bufferStore, nfaState.getRuns(), nfaState.getComputationStages());
-            this.highwatermark = nfaState.getLatestOffset();
+        if (this.currentNFAState != null) {
+            LOG.debug("Recovering existing nfa states for {}, latest offset {}", runned, this.currentNFAState.getLatestOffsets());
+            nfa = new NFA<>(aggregatesStore, bufferStore, this.currentNFAState.getRuns(), this.currentNFAState.getComputationStages());
         } else {
             nfa = new NFA<>(aggregatesStore, bufferStore, stages);
+            this.currentNFAState = new NFAStates<>(nfa.getComputationStages(), nfa.getRuns());
         }
         return nfa;
     }
@@ -111,23 +136,25 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
             return;
         }
         final NFA<K, V> nfa = loadNFA(this.stages, key);
-        if (checkHighWaterMarkAndUpdate()) {
+        if (checkHighWaterMark()) {
             Event<K, V> event = new Event<>(key, value, context.timestamp(), context.topic(), context.partition(), context.offset());
             List<Sequence<K, V>> sequences = nfa.matchPattern(event);
-            NFAStates<K, V> state = new NFAStates<>(nfa.getComputationStages(), nfa.getRuns(), context.offset() + 1);
-            this.nfaStore.put(getRunned(key), state);
+
+            Map<String, Long> latestOffsets = this.currentNFAState.getLatestOffsets();
+            latestOffsets.put(this.context.topic(), this.context.offset() + 1);
+            this.currentNFAState = new NFAStates<>(nfa.getComputationStages(), nfa.getRuns(), latestOffsets);
+            this.nfaStore.put(getRunned(key), this.currentNFAState);
             sequences.forEach(seq -> this.context.forward(key, seq));
         }
     }
 
-    private boolean checkHighWaterMarkAndUpdate() {
-        /**
-        if (this.context.offset() < this.highwatermark) {
-            LOG.warn("Offset({}) is prior to the current high-water mark({})", this.context.offset(), this.highwatermark);
+    private boolean checkHighWaterMark() {
+        Long latestOffset = this.currentNFAState.getLatestOffsetForTopic(this.context.topic());
+        if (latestOffset == null) latestOffset = -1L;
+        if (this.context.offset() < latestOffset) {
+            LOG.warn("Offset({}) is prior to the current high-water mark({}) for topic={}", this.context.offset(), latestOffset, this.context.topic());
             return false;
         }
-        this.highwatermark = this.context.offset();
-         **/
         return true;
     }
 

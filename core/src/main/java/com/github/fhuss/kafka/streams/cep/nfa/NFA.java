@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
@@ -76,11 +77,14 @@ public class NFA<K, V> implements Serializable {
     /**
      * Creates a new {@link NFA} instance.
      */
-    public NFA(final AggregatesStore aggregatesStore,
-               final SharedVersionedBufferStore<K, V> buffer,
-               final Long runs,
+    public NFA(final AggregatesStore<K> aggregatesStore,
+               final SharedVersionedBufferStore<K, V> sharedVersionedBuffer,
+               final long runs,
                final Queue<ComputationStage<K, V>> computationStages) {
-        this.sharedVersionedBuffer = buffer;
+        Objects.requireNonNull(aggregatesStore, "aggregateStore cannot be null");
+        Objects.requireNonNull(sharedVersionedBuffer, "sharedVersionedBuffer cannot be null");
+        Objects.requireNonNull(computationStages, "computationStages cannot be null");
+        this.sharedVersionedBuffer = sharedVersionedBuffer;
         this.computationStages = computationStages;
         this.runs = new AtomicLong(runs);
         this.aggregatesStore = aggregatesStore;

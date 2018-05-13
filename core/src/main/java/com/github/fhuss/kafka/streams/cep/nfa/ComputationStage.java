@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -21,10 +21,11 @@ import com.github.fhuss.kafka.streams.cep.Event;
 import java.util.List;
 
 /**
- * Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
+ * The implementation is based on the paper "Efficient Pattern Matching over Event Streams".
+ * @see <a href="https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf">https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf</a>
  *
- * @param <K> the type of the key event.
- * @param <V> the type of the value event.
+ * @param <K> the type of keys
+ * @param <V> the type of values
  */
 public class ComputationStage<K, V> {
 
@@ -50,7 +51,9 @@ public class ComputationStage<K, V> {
      */
     private final DeweyVersion version;
 
-
+    /**
+     * The sequence number of this run.
+     */
     private final long sequence;
 
     /**
@@ -59,18 +62,19 @@ public class ComputationStage<K, V> {
     private final boolean isBranching;
 
     /**
-     * Flag to indicate this computation stage is the first of a new branch.
+     * Flag to indicate this computation stage is resulting from an ignoring edge.
      */
     private final boolean isIgnored;
 
     /**
      * Creates a new {@link ComputationStage} instance.
-     * @param stage
-     * @param version
-     * @param lastEvent
-     * @param timestamp
-     * @param sequence
-     * @param isBranching
+     *
+     * @param stage         the stage
+     * @param version       the current dewey version number for this stage
+     * @param lastEvent     the pointer to the most recent event into the share buffer
+     * @param timestamp     the timestamp of the first matching-event in the sequence
+     * @param sequence      the sequence number of this run
+     * @param isBranching   Flag to indicate this computation stage is the first of a new branch
      */
     ComputationStage(final Stage<K, V> stage,
                      final DeweyVersion version,
@@ -82,6 +86,17 @@ public class ComputationStage<K, V> {
         this(stage.getName(), stage, version, lastEvent, timestamp, sequence, isBranching, IsIgnore);
     }
 
+    /**
+     * Creates a new {@link ComputationStage} instance.
+     *
+     * @param stage         the stage name
+     * @param version       the current dewey version number for this stage
+     * @param lastEvent     the pointer to the most recent event into the share buffer
+     * @param timestamp     the timestamp of the first matching-event in the sequence
+     * @param sequence      the sequence number of this run
+     * @param isBranching   flag to indicate this computation stage is the first of a new branch
+     * @param IsIgnore      flag to indicate this computation stage is resulting from an ignoring edge
+     */
     private ComputationStage(final String name,
                      final Stage<K, V> stage,
                      final DeweyVersion version,

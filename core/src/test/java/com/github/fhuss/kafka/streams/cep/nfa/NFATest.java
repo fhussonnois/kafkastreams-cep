@@ -83,8 +83,6 @@ public class NFATest {
                         double average = (int)states.get("sum") / (int)states.get("count");
                         return average < event.value();
                     })
-                    .<Integer>fold("sum", (key, value, state) -> state)
-                    .<Integer>fold("count", (key, value, state) -> state)
                 .build();
 
         final NFA<String, Integer> nfa = newNFA(pattern, Serdes.String(), Serdes.Integer());

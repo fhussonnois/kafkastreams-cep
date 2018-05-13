@@ -19,28 +19,47 @@ package com.github.fhuss.kafka.streams.cep.state.internal;
 import com.github.fhuss.kafka.streams.cep.nfa.ComputationStage;
 
 import java.io.Serializable;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Queue;
 
-public class NFAStates<K, V> implements Comparable<NFAStates>, Serializable {
+/**
+ * This class is used to wrap the execution state of an {@link com.github.fhuss.kafka.streams.cep.nfa.NFA} instance.
+ *
+ * @param <K> the type of keys
+ * @param <V> the type of values
+ */
+public class NFAStates<K, V> implements Serializable {
 
-    private Queue<ComputationStage<K, V>> computationStages;
-    private Long runs;
-    private Long latestOffset;
-
-    public NFAStates(){}
+    private final Queue<ComputationStage<K, V>> computationStages;
+    private final Long runs;
+    private final Map<String, Long> latestOffsets;
 
     /**
      * Creates a new {@link NFAStates} instance.
-     * @param computationStages
-     * @param runs
-     * @param latestOffset
+     *
+     * @param computationStages     the running computation stages.
+     * @param runs                  the sequence number to use for next run.
+     */
+    public NFAStates(final Queue<ComputationStage<K, V>> computationStages,
+                     final Long runs) {
+        this(computationStages, runs, new HashMap<>());
+    }
+
+    /**
+     * Creates a new {@link NFAStates} instance.
+     *
+     * @param computationStages     the running computation stages.
+     * @param runs                  the sequence number to use for next run.
+     * @param latestOffsets         the last processed offers per topic.
      */
     public NFAStates(final Queue<ComputationStage<K, V>> computationStages,
                      final Long runs,
-                     final Long latestOffset) {
+                     final Map<String, Long> latestOffsets) {
         this.computationStages = computationStages;
         this.runs = runs;
-        this.latestOffset = latestOffset;
+        this.latestOffsets = latestOffsets;
     }
 
     public Queue<ComputationStage<K, V>> getComputationStages() {
@@ -51,17 +70,40 @@ public class NFAStates<K, V> implements Comparable<NFAStates>, Serializable {
         return runs;
     }
 
-    public Long getLatestOffset() {
-        return latestOffset;
+    public Map<String, Long> getLatestOffsets() {
+        return new HashMap<>(latestOffsets);
     }
 
+    public Long getLatestOffsetForTopic(final String topic) {
+        return latestOffsets.get(topic);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public int hashCode() {
-        return latestOffset.hashCode();
+        return runs.hashCode();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        NFAStates<?, ?> nfaStates = (NFAStates<?, ?>) o;
+        return Objects.equals(runs, nfaStates.runs) &&
+                Objects.equals(latestOffsets, nfaStates.latestOffsets);
     }
 
     @Override
-    public int compareTo(NFAStates that) {
-        return this.latestOffset.compareTo(that.latestOffset);
+    public String toString() {
+        return "NFAStates{" +
+                "computationStages=" + computationStages +
+                ", runs=" + runs +
+                ", latestOffsets=" + latestOffsets +
+                '}';
     }
 }

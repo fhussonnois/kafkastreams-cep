@@ -64,7 +64,7 @@ public class ComplexStreamsBuilder {
      * @return a {@link CEPStream} for the specified topics
      */
     public <K, V> CEPStream<K, V> stream(final String topic,
-                                       final Consumed<K, V> consumed) {
+                                         final Consumed<K, V> consumed) {
         return stream(builder.stream(Collections.singleton(topic), consumed));
     }
 

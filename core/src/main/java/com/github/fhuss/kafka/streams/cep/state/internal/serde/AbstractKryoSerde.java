@@ -39,7 +39,7 @@ public abstract class AbstractKryoSerde <T, K, V>  implements Serializer<T>, Des
      * @param keys Serde used for key.
      * @param values Serde used for value.
      */
-    public AbstractKryoSerde(final Serde<K> keys, final Serde<V> values) {
+    AbstractKryoSerde(final Serde<K> keys, final Serde<V> values) {
         if (keys == null) throw new IllegalArgumentException("keys null");
         if (values == null) throw new IllegalArgumentException("values null");
         this.keys = keys;
@@ -61,6 +61,7 @@ public abstract class AbstractKryoSerde <T, K, V>  implements Serializer<T>, Des
 
     @Override
     public byte[] serialize(String topic, T data) {
+        if (data == null) return null;
         ByteArrayOutputStream basos = new ByteArrayOutputStream();
         Output output = new Output(basos);
         serialize(topic, data, output);
