@@ -17,7 +17,11 @@
 package com.github.fhuss.kafka.streams.cep.pattern;
 
 /**
+ * Default interface to aggregate value between complex pattern stages.
  *
+ * @param <K>   the record key type.
+ * @param <V>   the record value type.
+ * @param <T>   the aggregate value type.
  */
 @FunctionalInterface
 public interface Aggregator<K, V, T> {

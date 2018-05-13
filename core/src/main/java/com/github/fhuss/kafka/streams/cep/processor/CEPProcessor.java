@@ -18,9 +18,9 @@ package com.github.fhuss.kafka.streams.cep.processor;
 
 import com.github.fhuss.kafka.streams.cep.Event;
 import com.github.fhuss.kafka.streams.cep.Sequence;
+import com.github.fhuss.kafka.streams.cep.nfa.Stages;
 import com.github.fhuss.kafka.streams.cep.state.AggregatesStore;
 import com.github.fhuss.kafka.streams.cep.nfa.NFA;
-import com.github.fhuss.kafka.streams.cep.nfa.Stage;
 import com.github.fhuss.kafka.streams.cep.state.NFAStore;
 import com.github.fhuss.kafka.streams.cep.state.SharedVersionedBufferStore;
 import com.github.fhuss.kafka.streams.cep.pattern.Pattern;
@@ -46,7 +46,7 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
 
     private static final Logger LOG = LoggerFactory.getLogger(CEPProcessor.class);
 
-    private List<Stage<K, V>> stages;
+    private Stages<K, V> stages;
 
     private ProcessorContext context;
 
@@ -77,8 +77,8 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
      * @param queryName the complex pattern query name.
      * @param stages   the complex pattern.
      */
-    public CEPProcessor(final String queryName,
-                        final List<Stage<K, V>> stages) {
+    CEPProcessor(final String queryName,
+                 final Stages<K, V> stages) {
         this.stages = stages;
         this.queryName = queryName.toLowerCase().replace("\\s+", "");
     }
@@ -108,15 +108,16 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
     }
 
     @SuppressWarnings("unchecked")
-    private NFA<K, V> loadNFA(List<Stage<K, V>> stages, K key) {
+    private NFA<K, V> loadNFA(Stages<K, V> stages, K key) {
         final Runned<K> runned = getRunned(key);
         this.currentNFAState = nfaStore.find(runned);
         NFA<K, V> nfa;
         if (this.currentNFAState != null) {
             LOG.debug("Recovering existing nfa states for {}, latest offset {}", runned, this.currentNFAState.getLatestOffsets());
-            nfa = new NFA<>(aggregatesStore, bufferStore, this.currentNFAState.getRuns(), this.currentNFAState.getComputationStages());
+
+            nfa = new NFA<>(aggregatesStore, bufferStore, stages.getDefinedStates(), this.currentNFAState.getComputationStages(), this.currentNFAState.getRuns());
         } else {
-            nfa = new NFA<>(aggregatesStore, bufferStore, stages);
+            nfa = NFA.build(stages, aggregatesStore, bufferStore);
             this.currentNFAState = new NFAStates<>(nfa.getComputationStages(), nfa.getRuns());
         }
         return nfa;

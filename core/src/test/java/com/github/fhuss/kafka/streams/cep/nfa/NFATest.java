@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -95,7 +95,7 @@ public class NFATest {
 
         assertEquals(1, s.size());
 
-        //assertNFA(nfa, 2, 1);
+        assertNFA(nfa, 5, 2);
 
         Sequence<String, Integer> expected =  Sequence.<String, Integer>newBuilder()
                 .add("latest", e4)
@@ -143,7 +143,7 @@ public class NFATest {
 
         assertEquals(1, s.size());
 
-        //assertNFA(nfa, 2, 1);
+        assertNFA(nfa, 5, 2);
 
         Sequence<String, Integer> expected =  Sequence.<String, Integer>newBuilder()
                 .add("latest", e4)
@@ -568,9 +568,9 @@ public class NFATest {
         assertEquals(expected2, s.get(1));
     }
 
-    private void assertNFA(NFA<String, String> nfa, int runs, int stage) {
+    private <K, V> void assertNFA(NFA<K, V> nfa, int runs, int stage) {
         Assert.assertEquals(runs, nfa.getRuns());
-        Queue<ComputationStage<String, String>> computationStages = nfa.getComputationStages();
+        Queue<ComputationStage<K, V>> computationStages = nfa.getComputationStages();
         Assert.assertEquals(stage, computationStages.size());
     }
 
@@ -584,7 +584,8 @@ public class NFATest {
     }
 
     private <K, V> NFA<K, V> newNFA(Pattern<K, V> pattern, Serde<K> keySerde, Serde<V> valSerde) {
-        List<Stage<K, V>> stages = new StagesFactory<K, V>().make(pattern);
+        StagesFactory<K, V> factory = new StagesFactory<>();
+        Stages<K, V> stages = factory.make(pattern);
 
         SharedVersionedBufferStore<K, V> bufferStore =  new SharedVersionedBufferStoreImpl<>(
                 new InMemoryKeyValueStore<>("test-buffer", Serdes.Bytes(), Serdes.ByteArray()), keySerde, valSerde);
@@ -596,7 +597,7 @@ public class NFATest {
 
         aggStore.init(new NoOpProcessorContext(), null);
 
-        return new NFA<>(aggStore, bufferStore, stages);
+        return NFA.build(stages, aggStore, bufferStore);
     }
 
     private <K, V> Event<K, V> nextEvent(String topic, int partition, K key, V value) {

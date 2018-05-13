@@ -22,6 +22,9 @@ import org.apache.kafka.streams.kstream.KStream;
 
 /**
  * Default interface to build a CEP Streams.
+ *
+ * @param <K>   the record key type.
+ * @param <V>   the record value type.
  */
 public interface CEPStream<K, V> {
 

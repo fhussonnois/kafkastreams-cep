@@ -17,11 +17,22 @@
 package com.github.fhuss.kafka.streams.cep.pattern;
 
 
+/**
+ *
+ * @param <K>   the record key type.
+ * @param <V>   the record value type.
+ * @param <T>   the aggregate value type.
+ */
 public class StateAggregator<K, V, T> {
 
     private final String name;
     private final Aggregator<K, V, T> aggregate;
 
+    /**
+     * Creates a new {@link StateAggregator} instance.
+     * @param name          the name of the state.
+     * @param aggregate     the aggregate function.
+     */
     StateAggregator(final String name, final Aggregator<K, V, T> aggregate) {
         this.name = name;
         this.aggregate = aggregate;

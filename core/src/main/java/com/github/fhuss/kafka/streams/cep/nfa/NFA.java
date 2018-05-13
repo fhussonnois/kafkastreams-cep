@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -38,6 +38,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -61,17 +62,29 @@ public class NFA<K, V> implements Serializable {
 
     private Queue<ComputationStage<K, V>> computationStages;
 
+    private Set<String> aggregatesName;
+
     private final AggregatesStore<K> aggregatesStore;
 
     private AtomicLong runs;
 
+    public static <K, V> NFA<K, V> build(final Stages<K, V> stages,
+                                         final AggregatesStore<K> aggregatesStore,
+                                         final SharedVersionedBufferStore<K, V> sharedVersionedBuffer) {
+        LinkedBlockingQueue<ComputationStage<K, V>> queue = new LinkedBlockingQueue<>();
+        queue.add(stages.initialComputationStage());
+        return new NFA<>(aggregatesStore, sharedVersionedBuffer, stages.getDefinedStates(), queue);
+    }
+
+
     /**
      * Creates a new {@link NFA} instance.
      */
-    public NFA(final AggregatesStore<K> states,
-               final SharedVersionedBufferStore<K, V> buffer,
-               final Collection<Stage<K, V>> stages) {
-        this(states, buffer, INITIAL_RUNS, initComputationStates(stages));
+    public NFA(final AggregatesStore<K> aggregatesStore,
+               final SharedVersionedBufferStore<K, V> sharedVersionedBuffer,
+               final Set<String> aggregatesName,
+               final Queue<ComputationStage<K, V>> computationStages) {
+        this(aggregatesStore, sharedVersionedBuffer, aggregatesName, computationStages, INITIAL_RUNS);
     }
 
     /**
@@ -79,11 +92,13 @@ public class NFA<K, V> implements Serializable {
      */
     public NFA(final AggregatesStore<K> aggregatesStore,
                final SharedVersionedBufferStore<K, V> sharedVersionedBuffer,
-               final long runs,
-               final Queue<ComputationStage<K, V>> computationStages) {
+               final Set<String> aggregatesName,
+               final Queue<ComputationStage<K, V>> computationStages, final long runs) {
         Objects.requireNonNull(aggregatesStore, "aggregateStore cannot be null");
         Objects.requireNonNull(sharedVersionedBuffer, "sharedVersionedBuffer cannot be null");
         Objects.requireNonNull(computationStages, "computationStages cannot be null");
+        Objects.requireNonNull(aggregatesName, "aggregatesName cannot be null");
+        this.aggregatesName = aggregatesName;
         this.sharedVersionedBuffer = sharedVersionedBuffer;
         this.computationStages = computationStages;
         this.runs = new AtomicLong(runs);
@@ -92,15 +107,6 @@ public class NFA<K, V> implements Serializable {
 
     public long getRuns() {
         return runs.get();
-    }
-
-    private static <K, V> Queue<ComputationStage<K, V>> initComputationStates(Collection<Stage<K, V>> stages) {
-        Queue<ComputationStage<K, V>> q = new LinkedBlockingQueue<>();
-        stages.forEach(s -> {
-            if (s.isBeginState())
-                q.add(new ComputationStageBuilder<K, V>().setStage(s).setVersion(new DeweyVersion(1)).setSequence(1L).build());
-        });
-        return q;
     }
 
     public Queue<ComputationStage<K, V>> getComputationStages() {
@@ -280,8 +286,8 @@ public class NFA<K, V> implements Serializable {
                         .setBranching(true);
                 nextComputationStages.add(builder.build());
 
-                currentStage.getAggregates().forEach(agg -> {
-                    Aggregated<K> aggregated = new Aggregated<>(currentEvent.key(), new Aggregate(agg.getName(), sequenceId));
+                this.aggregatesName.forEach(agg -> {
+                    Aggregated<K> aggregated = new Aggregated<>(currentEvent.key(), new Aggregate(agg, sequenceId));
                     aggregatesStore.branch(aggregated, newSequence);
                 });
 

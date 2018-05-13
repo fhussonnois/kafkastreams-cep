@@ -19,6 +19,7 @@ package com.github.fhuss.kafka.streams.cep.pattern;
 import com.github.fhuss.kafka.streams.cep.nfa.EdgeOperation;
 import com.github.fhuss.kafka.streams.cep.nfa.NFA;
 import com.github.fhuss.kafka.streams.cep.nfa.Stage;
+import com.github.fhuss.kafka.streams.cep.nfa.Stages;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,7 +42,7 @@ public class StagesFactory<K, V> {
      * @param pattern the pattern to make.
      * @return a new {@link NFA} instance.
      */
-    public List<Stage<K, V>> make(final Pattern<K, V> pattern) {
+    public Stages<K, V> make(final Pattern<K, V> pattern) {
         if( pattern == null) throw new NullPointerException("Cannot make null pattern");
 
         final List<Stage<K, V>> sequence = new ArrayList<>();
@@ -61,7 +62,7 @@ public class StagesFactory<K, V> {
         }
         sequence.addAll(buildStages(Stage.StateType.BEGIN, currentPattern, successorStage, successorPattern));
 
-        return sequence;
+        return new Stages<>(sequence);
     }
 
     private int nextStageId() {

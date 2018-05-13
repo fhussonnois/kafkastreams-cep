@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -16,16 +16,14 @@
  */
 package com.github.fhuss.kafka.streams.cep.nfa;
 
-import com.github.fhuss.kafka.streams.cep.Event;
 import com.github.fhuss.kafka.streams.cep.pattern.MatcherContext;
-import com.github.fhuss.kafka.streams.cep.state.ReadOnlySharedVersionBuffer;
-import com.github.fhuss.kafka.streams.cep.state.States;
 import com.github.fhuss.kafka.streams.cep.pattern.Matcher;
 import com.github.fhuss.kafka.streams.cep.pattern.StateAggregator;
 
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -35,13 +33,18 @@ import java.util.stream.Collectors;
  *
  * The implementation is based on the paper "Efficient Pattern Matching over Event Streams".
  * @see <a href="https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf">https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf</a>
+ *
+ * @param <K>   the record key type.
+ * @param <V>   the record value type.
  */
 public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
+
+    private static final int DEFAULT_WINDOW_MS = -1;
 
     private int id;
     private String name;
     private StateType type;
-    private long windowMs = -1;
+    private long windowMs;
     private List<StateAggregator<K, V, Object>> aggregates;
     private List<Edge<K, V>> edges;
 
@@ -60,10 +63,21 @@ public class Stage<K, V> implements Serializable, Comparable<Stage<K, V>> {
      * @param type  the type of the stage.
      */
     public Stage(final int id, final String name, final StateType type) {
+        this(id, name, type, DEFAULT_WINDOW_MS, new ArrayList<>(), new ArrayList<>());
+    }
+
+    public Stage(final int id,
+                 final String name,
+                 final StateType type,
+                 final long windowMs,
+                 final List<StateAggregator<K, V, Object>> aggregates,
+                 final List<Edge<K, V>> edges) {
         this.id = id;
         this.name = name;
         this.type = type;
-        this.edges = new ArrayList<>();
+        this.windowMs = windowMs;
+        this.aggregates = aggregates;
+        this.edges = edges;
     }
 
     public void setAggregates(final List<StateAggregator<K, V, Object>> aggregator) {

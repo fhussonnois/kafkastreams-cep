@@ -79,7 +79,6 @@ public class CEPStreamIntegrationTest {
                 .then()
             .select("stage-3", Selected.withSkipTilAnyMatch().withTopic(INPUT_TOPIC_2))
                 .where((event, states) -> event.value() >= ((Integer) states.get("sum")))
-                .fold("sum", (Aggregator<String, Integer, Integer>) (s, v, curr) -> curr)
             .within(1, TimeUnit.HOURS)
             .build();
 

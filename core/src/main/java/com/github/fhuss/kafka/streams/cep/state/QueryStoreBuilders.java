@@ -16,7 +16,7 @@
  */
 package com.github.fhuss.kafka.streams.cep.state;
 
-import com.github.fhuss.kafka.streams.cep.nfa.Stage;
+import com.github.fhuss.kafka.streams.cep.nfa.Stages;
 import com.github.fhuss.kafka.streams.cep.pattern.Pattern;
 import com.github.fhuss.kafka.streams.cep.pattern.StagesFactory;
 import org.apache.kafka.common.serialization.Serde;
@@ -24,16 +24,17 @@ import org.apache.kafka.streams.state.KeyValueBytesStoreSupplier;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
 
-import java.util.List;
-
 /**
  * Helpers class to build required stores.
+ *
+ * @param <K>   the record key type.
+ * @param <V>   the record value type.
  */
 public class QueryStoreBuilders<K, V> {
 
     private final String queryName;
 
-    private final List<Stage<K, V>> stages;
+    private final Stages<K, V> stages;
 
     private final StagesFactory<K, V> factory;
 
@@ -71,7 +72,7 @@ public class QueryStoreBuilders<K, V> {
         final String storeName = QueryStores.getQueryNFAStoreName(queryName);
         final KeyValueBytesStoreSupplier storeSupplier = Stores.persistentKeyValueStore(storeName);
 
-        return QueryStores.nfaStoreBuilder(storeSupplier, stages, keySerde, valueSerde);
+        return QueryStores.nfaStoreBuilder(storeSupplier, stages.getAllStages(), keySerde, valueSerde);
     }
 
     /**

@@ -30,10 +30,8 @@ import java.util.List;
 public class ComputationStage<K, V> {
 
     /**
-     * The name of stage.
+     * The stage.
      */
-    private final String name;
-
     private final Stage<K , V> stage;
 
     /**
@@ -83,30 +81,6 @@ public class ComputationStage<K, V> {
                      final long sequence,
                      final boolean isBranching,
                      final boolean IsIgnore) {
-        this(stage.getName(), stage, version, lastEvent, timestamp, sequence, isBranching, IsIgnore);
-    }
-
-    /**
-     * Creates a new {@link ComputationStage} instance.
-     *
-     * @param stage         the stage name
-     * @param version       the current dewey version number for this stage
-     * @param lastEvent     the pointer to the most recent event into the share buffer
-     * @param timestamp     the timestamp of the first matching-event in the sequence
-     * @param sequence      the sequence number of this run
-     * @param isBranching   flag to indicate this computation stage is the first of a new branch
-     * @param IsIgnore      flag to indicate this computation stage is resulting from an ignoring edge
-     */
-    private ComputationStage(final String name,
-                     final Stage<K, V> stage,
-                     final DeweyVersion version,
-                     final Event<K, V> lastEvent,
-                     final long timestamp,
-                     final long sequence,
-                     final boolean isBranching,
-                     final boolean IsIgnore
-    ) {
-        this.name = name;
         this.stage = stage;
         this.lastEvent = lastEvent;
         this.timestamp = timestamp;

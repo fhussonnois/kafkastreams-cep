@@ -22,6 +22,8 @@ import org.apache.kafka.streams.state.KeyValueStore;
 
 /**
  * Simple class to wrap a {@link KeyValueStore}.
+ *
+ * @param <K>   the record key type.
  */
 public class States<K> {
 
@@ -34,8 +36,9 @@ public class States<K> {
     /**
      * Creates a new {@link States} instance.
      *
-     * @param states
-     * @param sequence
+     * @param states    the aggregates store.
+     * @param key       the record key used to store aggregates.
+     * @param sequence  The sequence number (aka run) used to store aggregates.
      */
     public States(final AggregatesStore<K> states, K key, long sequence) {
         this.store = states;
@@ -49,8 +52,10 @@ public class States<K> {
      * @param state the state name.
      * @return <code>null</code> if no state exists for the given key.
      */
-    public <T> T get(String state) {
-        return (T) store.find(new Aggregated<>(key, new Aggregate(state, sequence)));
+    public <T> T get(final String state) {
+        T v = getOrNull(state);
+        if (v == null) throw new UnknownAggregateException(state);
+        return v;
     }
 
     /**
@@ -61,9 +66,24 @@ public class States<K> {
      * @param <T> the of default value.
      * @return {@literal def} if no state exists for the given key.
      */
-    @SuppressWarnings("unchecked")
     public <T> T getOrElse(String key, T def) {
-        T val = (T) get(key);
+        T val = getOrNull(key);
         return val != null ? val : def;
+    }
+
+    private <T> T getOrNull(String state) {
+        Aggregated<K> aggregated = new Aggregated<>(key, new Aggregate(state, sequence));
+        return store.find(aggregated);
+    }
+
+    static class UnknownAggregateException extends RuntimeException {
+        /**
+         * Creates a new {@link UnknownAggregateException} instance.
+         *
+         * @param state the state name.
+         */
+        UnknownAggregateException(final String state) {
+            super("No state found for name '" + state + "'");
+        }
     }
 }

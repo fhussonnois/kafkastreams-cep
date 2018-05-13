@@ -16,7 +16,7 @@
  */
 package com.github.fhuss.kafka.streams.cep.processor;
 
-import com.github.fhuss.kafka.streams.cep.nfa.Stage;
+import com.github.fhuss.kafka.streams.cep.nfa.Stages;
 import com.github.fhuss.kafka.streams.cep.pattern.Pattern;
 import com.github.fhuss.kafka.streams.cep.pattern.PredicateBuilder;
 import com.github.fhuss.kafka.streams.cep.pattern.QueryBuilder;
@@ -38,7 +38,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.fail;
@@ -68,7 +67,7 @@ public class CEPProcessorTest {
         this.pattern = PATTERN.build();
 
         StagesFactory<String, String> factory = new StagesFactory<>();
-        List<Stage<String, String>> stages = factory.make(pattern);
+        Stages<String, String> stages = factory.make(pattern);
 
         this.processor = new CEPProcessor<>(TEST_QUERY, stages);
 
@@ -80,7 +79,7 @@ public class CEPProcessorTest {
         );
 
         NFAStore<String, String> nfaStore = new NFAStoreImpl<>(
-                new InMemoryKeyValueStore<>(QueryStores.getQueryNFAStoreName(TEST_QUERY), Serdes.Bytes(), Serdes.ByteArray()), stages, Serdes.String(), Serdes.String());
+                new InMemoryKeyValueStore<>(QueryStores.getQueryNFAStoreName(TEST_QUERY), Serdes.Bytes(), Serdes.ByteArray()), stages.getAllStages(), Serdes.String(), Serdes.String());
 
         this.context.register(bufferStore);
         this.context.register(aggStore);

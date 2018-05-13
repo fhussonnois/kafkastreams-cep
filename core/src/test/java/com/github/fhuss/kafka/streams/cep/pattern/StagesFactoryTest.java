@@ -19,6 +19,7 @@ package com.github.fhuss.kafka.streams.cep.pattern;
 import com.github.fhuss.kafka.streams.cep.TestMatcher;
 import com.github.fhuss.kafka.streams.cep.nfa.EdgeOperation;
 import com.github.fhuss.kafka.streams.cep.nfa.Stage;
+import com.github.fhuss.kafka.streams.cep.nfa.Stages;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -36,15 +37,15 @@ public class StagesFactoryTest {
                 .select(STAGE_1).where(TestMatcher.isEqualTo(0)).build();
 
         StagesFactory<String, Integer> factory = new StagesFactory<>();
-        List<Stage<String, Integer>> stages = factory.make(pattern);
+        Stages<String, Integer> stages = factory.make(pattern);
 
-        Assert.assertEquals(2, stages.size());
-        final Stage<String, Integer> stage0 = stages.get(0);
+        Assert.assertEquals(2, stages.getAllStages().size());
+        final Stage<String, Integer> stage0 = stages.getAllStages().get(0);
 
         Assert.assertEquals(Stage.StateType.FINAL, stage0.getType());
         Assert.assertEquals(0, stage0.getEdges().size());
 
-        final Stage<String, Integer> stage1 = stages.get(1);
+        final Stage<String, Integer> stage1 = stages.getAllStages().get(1);
 
         Assert.assertEquals(Stage.StateType.BEGIN, stage1.getType());
         Assert.assertEquals(1, stage1.getEdges().size());
@@ -64,7 +65,9 @@ public class StagesFactoryTest {
                 .build();
 
         StagesFactory<String, Integer> factory = new StagesFactory<>();
-        List<Stage<String, Integer>> stages = factory.make(pattern);
+        Stages<String, Integer> patternStages = factory.make(pattern);
+
+        List<Stage<String, Integer>> stages = patternStages.getAllStages();
 
         Assert.assertEquals(4, stages.size());
         Assert.assertEquals(Stage.StateType.FINAL, stages.get(0).getType());
@@ -90,7 +93,8 @@ public class StagesFactoryTest {
                 .build();
 
         StagesFactory<String, Integer> factory = new StagesFactory<>();
-        List<Stage<String, Integer>> stages = factory.make(pattern);
+        Stages<String, Integer> patternStages = factory.make(pattern);
+        List<Stage<String, Integer>> stages = patternStages.getAllStages();
 
         Assert.assertEquals(5, stages.size());
 
