@@ -113,6 +113,11 @@ public class StagesFactory<K, V> {
             // proceed = successor_begin || (!take && !ignore)
             boolean isStrict = selected.getStrategy().equals(Strategy.STRICT_CONTIGUITY);
 
+            if (successorPattern == null && successorStage.isFinalState()) {
+                throw new InvalidPatternException(
+                        "Cannot define a pattern with a final stage expecting multiple matching events");
+            }
+
             Matcher<K, V> successorPredicate = successorPattern.getPredicate();
             if (successorPattern.getSelected().getTopic() != null) {
                 Matcher.TopicPredicate<K,V> left = new Matcher.TopicPredicate<>(successorPattern.getSelected().getTopic());
@@ -149,5 +154,16 @@ public class StagesFactory<K, V> {
         else if( successorPattern!= null && successorPattern.getWindowTime() != null)
             return successorPattern.getWindowUnit().toMillis(successorPattern.getWindowTime());
         return -1;
+    }
+
+    public static class InvalidPatternException extends RuntimeException {
+
+        /**
+         * Creates a new {@link InvalidPatternException} instance.
+         * @param message   the error message.
+         */
+        public InvalidPatternException(final String message) {
+            super(message);
+        }
     }
 }

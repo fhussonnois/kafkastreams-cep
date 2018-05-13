@@ -31,6 +31,19 @@ public class StagesFactoryTest {
     private static final String STAGE_2  = "stage-2";
     private static final String STAGE_3  = "stage-3";
 
+
+    @Test(expected = StagesFactory.InvalidPatternException.class)
+    public void testInvalidPattern() {
+
+        Pattern<Object, String> pattern = new QueryBuilder<Object, String>()
+                .select()
+                .oneOrMore()
+                .where(TestMatcher.isEqualTo("N/A"))
+                .build();
+        StagesFactory<Object, String> factory = new StagesFactory<>();
+        factory.make(pattern);
+    }
+
     @Test
     public void testPatternWithSingleStage() {
         Pattern<String, Integer> pattern = new QueryBuilder<String, Integer>()
