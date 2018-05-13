@@ -102,9 +102,9 @@ QueryBuilder<String, Integer> builder = new QueryBuilder<>();
     <tr>
         <td><pre lang="java">select()</pre></td>
         <td>
-            <p>Defines a new simple pattern.</p>
+            <p>Defines a new stage.</p>
             <pre lang="java">select = query.select();</pre>
-            <p>Stage can be named</p>
+            <p>Stage can also be named - by default a stage is named based on its index (0-based)</p>
             <pre lang="java">select = query.select("my-first-stage");</pre>
         </td>
     </tr>
@@ -256,7 +256,7 @@ This strategy can be chosen while defining a new stage :
  
 ## How to match an event from a specific topic ?
 
-The KafkaStreams allow you to consume from multiple input topics.
+Kafka Streams allow you to consume from multiple input topics.
 
 While defining a new stage you can specify the topic name on which the pattern should be applied : 
  ```java
