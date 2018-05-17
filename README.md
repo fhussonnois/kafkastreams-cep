@@ -17,7 +17,7 @@ Note that the last version is currently not available in Maven Central yet.
 
 ### Maven dependency
 
-For Apache Kafka 0.10.0.1 (deprecated)
+For Apache Kafka 0.10.0.1 (deprecated & not stable)
 
 Available in [Maven Central](https://search.maven.org/#artifactdetails%7Ccom.github.fhuss%7Ckafka-streams-cep%7C0.1.0%7Cjar)
 
@@ -35,7 +35,7 @@ As of Apache Kafka 1.0.0
     <dependency>
       <groupId>com.github.fhuss</groupId>
       <artifactId>kafka-streams-cep</artifactId>
-      <version>0.2.0-SNAPSHOT</version>
+      <version>1.0.0</version>
     </dependency>
 ```
 
