@@ -20,7 +20,8 @@ public class StageBuilder<K, V> extends PredicateBuilder<K, V> {
 
     /**
      * Creates a new {@link StageBuilder} instance.
-     * @param pattern
+     *
+     * @param pattern the current pattern
      */
     StageBuilder(final Pattern<K, V> pattern) {
         super(pattern);
@@ -39,24 +40,6 @@ public class StageBuilder<K, V> extends PredicateBuilder<K, V> {
 
     public PredicateBuilder<K, V> times(int times) {
         this.pattern.setTimes(times);
-        return this;
-    }
-
-    @Deprecated
-    public StageBuilder<K, V> skipTillNextMatch() {
-        this.pattern.setStrategy(Strategy.SKIP_TIL_NEXT_MATCH);
-        return this;
-    }
-
-    @Deprecated
-    public StageBuilder<K, V> skipTillAnyMatch() {
-        this.pattern.setStrategy(Strategy.SKIP_TIL_ANY_MATCH);
-        return this;
-    }
-
-    @Deprecated
-    public StageBuilder<K, V> strictContiguity() {
-        this.pattern.setStrategy(Strategy.STRICT_CONTIGUITY);
         return this;
     }
 }

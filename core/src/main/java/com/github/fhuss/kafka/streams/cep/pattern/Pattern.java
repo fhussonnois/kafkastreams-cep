@@ -149,14 +149,6 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
         return this;
     }
 
-    /**
-     * @deprecated use {@link QueryBuilder#select(Selected)} to specify the event selection strategy to apply.
-     */
-    @Deprecated
-    void setStrategy(final Strategy strategy) {
-        this.selected = this.selected.withStrategy(strategy);
-    }
-
     void setWindow(long time, TimeUnit unit) {
         this.windowTime = time;
         this.windowUnit = unit;
