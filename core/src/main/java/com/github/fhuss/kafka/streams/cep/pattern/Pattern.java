@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -40,8 +40,6 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
             return val;
         }
     }
-
-
 
     private int level;
 
@@ -94,9 +92,10 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
     /**
      * Creates a new {@link Pattern} instance.
      *
-     * @param level    the level of this Pattern.
-     * @param name     the name of the event.
-     * @param ancestor the ancestor event pattern.
+     * @param level    the level of this pattern
+     * @param name     the name of the event
+     * @param selected
+     * @param ancestor the ancestor event pattern
      */
     private Pattern(final int level, final String name, final Selected selected, final Pattern<K, V> ancestor) {
         this.level     = level;

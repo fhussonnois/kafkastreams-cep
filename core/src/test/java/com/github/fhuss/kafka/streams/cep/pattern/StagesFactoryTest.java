@@ -33,11 +33,23 @@ public class StagesFactoryTest {
 
 
     @Test(expected = StagesFactory.InvalidPatternException.class)
-    public void testInvalidPattern() {
+    public void testInvalidPatternGivenAFinalOneOrMoreStage() {
 
         Pattern<Object, String> pattern = new QueryBuilder<Object, String>()
                 .select()
                 .oneOrMore()
+                .where(TestMatcher.isEqualTo("N/A"))
+                .build();
+        StagesFactory<Object, String> factory = new StagesFactory<>();
+        factory.make(pattern);
+    }
+
+    @Test(expected = StagesFactory.InvalidPatternException.class)
+    public void testInvalidPatternGivenAFinalOptionalStage() {
+
+        Pattern<Object, String> pattern = new QueryBuilder<Object, String>()
+                .select()
+                .optional()
                 .where(TestMatcher.isEqualTo("N/A"))
                 .build();
         StagesFactory<Object, String> factory = new StagesFactory<>();

@@ -43,6 +43,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
+import static com.github.fhuss.kafka.streams.cep.nfa.EdgeOperation.SKIP_PROCEED;
+
 /**
  * Non-determinism Finite Automaton.
  *
@@ -201,18 +203,22 @@ public class NFA<K, V> implements Serializable {
         final boolean ignored  = operations.contains(EdgeOperation.IGNORE);
 
         for (Stage.Edge<K, V> edge : matchedEdges) {
+            final EdgeOperation operation = edge.getOperation();
             LOG.debug("Matching stage with: name = {}, run = {}, version = {}, operation = {}, event = {}",
-                    currentStage.getName(), sequenceId, version, edge.getOperation(), currentEvent);
+                    currentStage.getName(), sequenceId, version, operation, currentEvent);
             final ComputationStageBuilder<K, V> builder = new ComputationStageBuilder<>();
-            switch (edge.getOperation()) {
-                case PROCEED:
+            switch (operation) {
+                case PROCEED :
+                case SKIP_PROCEED:
                     ComputationContext<K, V> nextContext = ctx;
                     // Checks whether epsilon operation is forwarding to a new stage and doesn't result from new branch.
                     if (isForwardingToNextStage(currentStage, computationStage, edge)) {
                         ComputationStage<K, V> newStage = computationStage.setVersion(version.addStage());
                         nextContext = new ComputationContext<>(ctx.event, newStage);
                     }
-                    Collection<ComputationStage<K, V>> stages = evaluate(nextContext, edge.getTarget(), currentStage);
+
+                    Stage<K, V> previous = operation.equals(SKIP_PROCEED) ? previousStage : currentStage;
+                    Collection<ComputationStage<K, V>> stages = evaluate(nextContext, edge.getTarget(), previous);
                     nextComputationStages.addAll(stages);
                     if (!stages.isEmpty()) {
                         proceed = true;

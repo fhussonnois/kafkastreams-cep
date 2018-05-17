@@ -156,6 +156,42 @@ public class NFATest {
     }
 
     /**
+     * Pattern : (A;B;C) / Events : A1, C3
+     *
+     * R1: A1, C3(matched)
+     * R2: _
+     */
+    @Test
+    public void testNFAGivenOptionalStageAndStrictContiguity() {
+
+        Pattern<String, String> pattern = new QueryBuilder<String, String>()
+                .select("first")
+                    .where(TestMatcher.isEqualTo("A"))
+                .then()
+                    .select("second")
+                    .optional()
+                    .where(TestMatcher.isEqualTo("B"))
+                .then()
+                    .select("latest")
+                    .where(TestMatcher.isEqualTo("C"))
+                .build();
+
+        final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
+
+        List<Sequence<String, String>> s = simulate(nfa, ev1, ev3);
+        assertEquals(1, s.size());
+
+        assertNFA(nfa, 2, 1);
+
+        Sequence<String, String> expected =  Sequence.<String, String>newBuilder()
+                .add("latest", ev3)
+                .add("first", ev1)
+                .build(true);
+
+        assertEquals(expected, s.get(0));
+    }
+
+    /**
      * Pattern : (A;B;C) / Events : A1, B2, C3
      *
      * R1: A1, B2, C3 (matched)

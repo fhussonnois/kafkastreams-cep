@@ -20,10 +20,14 @@ import com.github.fhuss.kafka.streams.cep.nfa.EdgeOperation;
 import com.github.fhuss.kafka.streams.cep.nfa.NFA;
 import com.github.fhuss.kafka.streams.cep.nfa.Stage;
 import com.github.fhuss.kafka.streams.cep.nfa.Stages;
+import com.github.fhuss.kafka.streams.cep.pattern.Pattern.Cardinality;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static com.github.fhuss.kafka.streams.cep.pattern.Pattern.Cardinality.*;
 
 /**
  * Default class to build all states based on a sequence pattern.
@@ -75,10 +79,11 @@ public class StagesFactory<K, V> {
                                    final Stage<K, V> successorStage,
                                    final Pattern<K, V> successorPattern) {
 
-        final Pattern.Cardinality cardinality = currentPattern.getCardinality();
+        final Cardinality cardinality = currentPattern.getCardinality();
+
         Stage.StateType currentType = type;
 
-        final boolean hasMandatoryState = cardinality.equals(Pattern.Cardinality.ONE_OR_MORE);
+        final boolean hasMandatoryState = cardinality.equals(ONE_OR_MORE);
 
         if (hasMandatoryState) currentType = Stage.StateType.NORMAL;
 
@@ -93,7 +98,7 @@ public class StagesFactory<K, V> {
                 Matcher.and(new Matcher.TopicPredicate<>(selected.getTopic()), currentPattern.getPredicate()) :
                 currentPattern.getPredicate();
 
-        EdgeOperation operation = cardinality.equals(Pattern.Cardinality.ONE) ? EdgeOperation.BEGIN : EdgeOperation.TAKE;
+        EdgeOperation operation = Arrays.asList(ONE, OPTIONAL).contains(cardinality) ? EdgeOperation.BEGIN : EdgeOperation.TAKE;
         stage.addEdge(new Stage.Edge<>(operation, predicate, successorStage));
 
         Matcher<K, V> ignore = null;
@@ -109,9 +114,19 @@ public class StagesFactory<K, V> {
             stage.addEdge(new Stage.Edge<>(EdgeOperation.IGNORE, ignore, null));
         }
 
+        if (cardinality.equals(OPTIONAL)) {
+            if (successorPattern == null && successorStage.isFinalState()) {
+                throw new InvalidPatternException(
+                        "Cannot define a pattern with an optional final stage");
+            }
+
+            Matcher<K, V> successorPredicate = successorPattern.getPredicate();
+            // proceed = successor_begin && !take
+            Matcher<K, V> skip = Matcher.and(successorPredicate, Matcher.not(predicate));
+            stage.addEdge(new Stage.Edge<>(EdgeOperation.SKIP_PROCEED, skip, successorStage));
+        }
+
         if (operation.equals(EdgeOperation.TAKE) ) {
-            // proceed = successor_begin || (!take && !ignore)
-            boolean isStrict = selected.getStrategy().equals(Strategy.STRICT_CONTIGUITY);
 
             if (successorPattern == null && successorStage.isFinalState()) {
                 throw new InvalidPatternException(
@@ -124,11 +139,14 @@ public class StagesFactory<K, V> {
                 successorPredicate = Matcher.and(left, successorPredicate);
             }
 
-            Matcher<K, V> proceed =
-                    isStrict ? Matcher.or(successorPredicate, Matcher.not(predicate)) :
-                            Matcher.or(
-                                    successorPredicate,
-                                    Matcher.and(Matcher.not(predicate), Matcher.not(ignore)));
+            Matcher<K, V> proceed;
+            if (selected.getStrategy().equals(Strategy.STRICT_CONTIGUITY)) {
+                // proceed = successor_begin || !take
+                proceed = Matcher.or(successorPredicate, Matcher.not(predicate));
+            } else {
+                // proceed = successor_begin || (!take && !ignore)
+                proceed = Matcher.or(successorPredicate, Matcher.and(Matcher.not(predicate), Matcher.not(ignore)));
+            }
             stage.addEdge(new Stage.Edge<>(EdgeOperation.PROCEED, proceed, successorStage));
         }
 

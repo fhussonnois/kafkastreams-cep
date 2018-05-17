@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -20,7 +20,7 @@ package com.github.fhuss.kafka.streams.cep.nfa;
 public enum EdgeOperation {
 
     /**
-     * A Forward edge which consume an consume an event from the input and write it to the buffer.
+     * A Forward edge which consume an event from the input and write it to the buffer.
      */
     BEGIN,
 
@@ -33,6 +33,11 @@ public enum EdgeOperation {
      * A Forward edge which do not consume event.
      */
     PROCEED,
+
+    /**
+     * A Forward edge which do not consume event. This operation is only used with optional stage.
+     */
+    SKIP_PROCEED,
 
     /**
      * A Looping edge which is defined by the selection strategy.
