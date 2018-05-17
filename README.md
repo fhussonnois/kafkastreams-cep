@@ -293,6 +293,7 @@ Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-si
 
 ### Build Query
 ```java
+            new QueryBuilder<String, StockEvent>()
             .select("stage-1")
                 .where((event, states) -> event.value().volume > 1000)
                 .<Long>fold("avg", (k, v, curr) -> v.price)
@@ -360,7 +361,7 @@ Run the demonstration class **CEPStockDemo** :
 
 - Create Input/Ouput streams topics
 ```bash
-/bin/kafka-topics --create --topic Stocks --partitions 2 --replication-factor 1 --zookeeper localhost:2181
+./bin/kafka-topics --create --topic Stocks --partitions 2 --replication-factor 1 --zookeeper localhost:2181
 Created topic "Stocks".
 
 /bin/kafka-topics --create --topic Matches --partitions 2 --replication-factor 1 --zookeeper localhost:2181
