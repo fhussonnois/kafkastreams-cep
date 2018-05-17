@@ -16,60 +16,47 @@
  */
 package com.github.fhuss.kafka.streams.cep.pattern;
 
-public class SelectBuilder<K, V> {
+public class StageBuilder<K, V> extends PredicateBuilder<K, V> {
 
-    private final Pattern<K, V> pattern;
-
-    SelectBuilder(final Pattern<K, V> pattern) {
-        this.pattern = pattern;
+    /**
+     * Creates a new {@link StageBuilder} instance.
+     * @param pattern
+     */
+    StageBuilder(final Pattern<K, V> pattern) {
+        super(pattern);
     }
 
-    public SelectBuilder<K, V> optional() {
-        pattern.setCardinality(Pattern.Cardinality.OPTIONAL);
+    public PredicateBuilder<K, V> oneOrMore() {
+        this.pattern.setCardinality(Pattern.Cardinality.ONE_OR_MORE);
         return this;
     }
 
-    public SelectBuilder<K, V> oneOrMore() {
-        pattern.setCardinality(Pattern.Cardinality.ONE_OR_MORE);
+    public PredicateBuilder<K, V> zeroOrMore() {
+        this.pattern.setCardinality(Pattern.Cardinality.ONE_OR_MORE);
+        this.pattern.setOptional(true);
         return this;
     }
 
-    public SelectBuilder<K, V> zeroOrMore() {
-        pattern.setCardinality(Pattern.Cardinality.ZERO_OR_MORE);
+    public PredicateBuilder<K, V> times(int times) {
+        this.pattern.setTimes(times);
         return this;
     }
 
     @Deprecated
-    public SelectBuilder<K, V> skipTillNextMatch() {
+    public StageBuilder<K, V> skipTillNextMatch() {
         this.pattern.setStrategy(Strategy.SKIP_TIL_NEXT_MATCH);
         return this;
     }
 
     @Deprecated
-    public SelectBuilder<K, V> skipTillAnyMatch() {
+    public StageBuilder<K, V> skipTillAnyMatch() {
         this.pattern.setStrategy(Strategy.SKIP_TIL_ANY_MATCH);
         return this;
     }
 
     @Deprecated
-    public SelectBuilder<K, V> strictContiguity() {
+    public StageBuilder<K, V> strictContiguity() {
         this.pattern.setStrategy(Strategy.STRICT_CONTIGUITY);
         return this;
     }
-
-    public PredicateBuilder<K, V> where(final SimpleMatcher<K, V> predicate) {
-        this.pattern.andPredicate(predicate);
-        return new PredicateBuilder<>(this.pattern);
-    }
-
-    public PredicateBuilder<K, V> where(final StatefulMatcher<K, V> predicate) {
-        this.pattern.andPredicate(predicate);
-        return new PredicateBuilder<>(this.pattern);
-    }
-
-    public PredicateBuilder<K, V> where(final SequenceMatcher<K, V> predicate) {
-        this.pattern.andPredicate(predicate);
-        return new PredicateBuilder<>(this.pattern);
-    }
-
 }

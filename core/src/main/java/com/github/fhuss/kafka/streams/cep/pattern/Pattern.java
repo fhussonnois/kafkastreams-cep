@@ -25,9 +25,7 @@ import java.util.concurrent.TimeUnit;
 public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
 
     public enum Cardinality {
-        ZERO_OR_MORE(-2),
         ONE_OR_MORE(-1),
-        OPTIONAL(0),
         ONE(1);
 
         private int val;
@@ -58,6 +56,10 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
     private Cardinality cardinality = Cardinality.ONE;
 
     private Selected selected;
+
+    private boolean isOptional = false;
+
+    private int times = 1;
 
     /**
      * Creates a new {@link Pattern} instance.
@@ -105,24 +107,40 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
         this.selected = selected == null ? Selected.withStrictContiguity() : selected;
     }
 
-    public SelectBuilder<K, V> select() {
-        return new SelectBuilder<>(this);
+    public StageBuilder<K, V> select() {
+        return new StageBuilder<>(this);
     }
 
-    public SelectBuilder<K, V> select(final Selected selected) {
+    public StageBuilder<K, V> select(final Selected selected) {
         this.selected = selected;
-        return new SelectBuilder<>(this);
+        return new StageBuilder<>(this);
     }
 
-    public SelectBuilder<K, V> select(final String name) {
+    public StageBuilder<K, V> select(final String name) {
         this.name = name;
-        return new SelectBuilder<>(this);
+        return new StageBuilder<>(this);
     }
 
-    public SelectBuilder<K, V> select(final String name, final Selected selected) {
+    public StageBuilder<K, V> select(final String name, final Selected selected) {
         this.name = name;
         this.selected = selected;
-        return new SelectBuilder<>(this);
+        return new StageBuilder<>(this);
+    }
+
+    boolean isOptional() {
+        return isOptional;
+    }
+
+    void setOptional(boolean optional) {
+        isOptional = optional;
+    }
+
+    void setTimes(int times) {
+        this.times = times;
+    }
+
+    int getTimes() {
+        return times;
     }
 
     @SuppressWarnings("unchecked")
@@ -157,6 +175,8 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
         else
             this.predicate = Matcher.or(this.predicate, predicate);
     }
+
+
 
     void setCardinality(final Cardinality cardinality) {
         this.cardinality = cardinality;
@@ -208,7 +228,7 @@ public class Pattern<K, V> implements Iterable<Pattern<K, V>> {
     private static class PatternIterator<K, V> implements Iterator<Pattern<K, V>> {
         private Pattern<K, V> current;
 
-        public PatternIterator(Pattern<K, V> pattern) {
+        PatternIterator(Pattern<K, V> pattern) {
             this.current = pattern;
         }
 

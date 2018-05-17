@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -24,9 +24,9 @@ public class QueryBuilder<K, V> {
     /**
      * Creates a new stage with no name.
      *
-     * @return a new {@link SelectBuilder}.
+     * @return a new {@link StageBuilder}.
      */
-    public SelectBuilder<K, V> select() {
+    public StageBuilder<K, V> select() {
         return select(DEFAULT_SELECT_STRATEGY);
     }
 
@@ -34,22 +34,22 @@ public class QueryBuilder<K, V> {
      * Creates a new stage with the specified name.
      *
      * @param name the stage name.
-     * @return a new {@link SelectBuilder}.
+     * @return a new {@link StageBuilder}.
      */
-    public SelectBuilder<K, V> select(final String name) {
+    public StageBuilder<K, V> select(final String name) {
         return select(name, DEFAULT_SELECT_STRATEGY);
     }
 
     /**
      * Creates a new stage with no name.
      *
-     * @return a new {@link SelectBuilder}.
+     * @return a new {@link StageBuilder}.
      */
-    public SelectBuilder<K, V> select(final Selected selected) {
-        return new SelectBuilder<>(new Pattern<>(selected));
+    public StageBuilder<K, V> select(final Selected selected) {
+        return new StageBuilder<>(new Pattern<>(selected));
     }
 
-    public SelectBuilder<K, V> select(final String name, final Selected selected) {
-        return new SelectBuilder<>(new Pattern<>(name, selected));
+    public StageBuilder<K, V> select(final String name, final Selected selected) {
+        return new StageBuilder<>(new Pattern<>(name, selected));
     }
 }

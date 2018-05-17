@@ -16,66 +16,36 @@
  */
 package com.github.fhuss.kafka.streams.cep.pattern;
 
-
-import java.util.concurrent.TimeUnit;
-
 public class PredicateBuilder<K, V> {
 
-    private final Pattern<K, V> pattern;
+    protected final Pattern<K, V> pattern;
 
     /**
-     * Creates a  new {@link PredicateBuilder} instance.
-     * @param pattern
+     * Creates a new {@link PredicateBuilder} instance.
+     *
+     * @param pattern the current pattern
      */
     PredicateBuilder(final Pattern<K, V> pattern) {
         this.pattern = pattern;
     }
 
-    public PredicateBuilder<K, V> and(final SimpleMatcher<K, V> predicate) {
+    public PatternBuilder<K, V> where(final SimpleMatcher<K, V> predicate) {
         this.pattern.andPredicate(predicate);
-        return this;
+        return new PatternBuilder<>(this.pattern);
     }
 
-    public PredicateBuilder<K, V> and(final StatefulMatcher<K, V> predicate) {
+    public PatternBuilder<K, V> where(final StatefulMatcher<K, V> predicate) {
         this.pattern.andPredicate(predicate);
-        return this;
+        return new PatternBuilder<>(this.pattern);
     }
 
-    public PredicateBuilder<K, V> and(final SequenceMatcher<K, V> predicate) {
+    public PatternBuilder<K, V> where(final SequenceMatcher<K, V> predicate) {
         this.pattern.andPredicate(predicate);
+        return new PatternBuilder<>(this.pattern);
+    }
+
+    public PredicateBuilder<K, V> optional() {
+        this.pattern.setOptional(true);
         return this;
-    }
-
-    public PredicateBuilder<K, V> or(final SimpleMatcher<K, V> predicate) {
-        this.pattern.orPredicate(predicate);
-        return this;
-    }
-
-    public PredicateBuilder<K, V> or(final StatefulMatcher<K, V> predicate) {
-        this.pattern.orPredicate(predicate);
-        return this;
-    }
-
-    public PredicateBuilder<K, V> or(final SequenceMatcher<K, V> predicate) {
-        this.pattern.orPredicate(predicate);
-        return this;
-    }
-
-    public <T> PredicateBuilder<K, V> fold(final String state, final Aggregator<K, V, T> aggregator) {
-        this.pattern.addStateAggregator(new StateAggregator<>(state, aggregator));
-        return this;
-    }
-
-    public PredicateBuilder<K, V> within(long time, TimeUnit unit) {
-        this.pattern.setWindow(time, unit);
-        return this;
-    }
-
-    public Pattern<K, V> then() {
-        return new Pattern<>(pattern);
-    }
-
-    public Pattern<K, V> build() {
-        return pattern;
     }
 }

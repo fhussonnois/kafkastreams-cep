@@ -51,8 +51,9 @@ public class NFATest {
     private Event<String, String> ev3 = new Event<>("ev3", "C", System.currentTimeMillis(), "test", 0, 2);
     private Event<String, String> ev4 = new Event<>("ev4", "C", System.currentTimeMillis(), "test", 0, 3);
     private Event<String, String> ev5 = new Event<>("ev5", "D", System.currentTimeMillis(), "test", 0, 4);
-
-    private Event<String, String> ev6 = new Event<>("ev6", "D", System.currentTimeMillis(), "test", 0, 5);
+    private Event<String, String> ev6 = new Event<>("ev6", "C", System.currentTimeMillis(), "test", 0, 5);
+    private Event<String, String> ev7 = new Event<>("ev7", "D", System.currentTimeMillis(), "test", 0, 6);
+    private Event<String, String> ev8 = new Event<>("ev8", "E", System.currentTimeMillis(), "test", 0, 7);
 
     private AtomicInteger offset;
 
@@ -150,6 +151,234 @@ public class NFATest {
                 .add("second", e3)
                 .add("second", e2)
                 .add("first", e1)
+                .build(true);
+
+        assertEquals(expected, s.get(0));
+    }
+
+    /**
+     * Pattern : (A;C{3} E) / Events : A1, C3, C4, C6, E8
+     *
+     * R1: A1, C3, C4, E8(matched)
+     * R2: _
+     */
+    @Test
+    public void testNFAGivenExpectingOccurrencesStage() {
+
+        Pattern<String, String> pattern = new QueryBuilder<String, String>()
+                .select("first")
+                    .where(TestMatcher.isEqualTo("A"))
+                    .then()
+                .select("second")
+                    .times(3)
+                    .where(TestMatcher.isEqualTo("C"))
+                .then()
+                    .select("latest")
+                    .where(TestMatcher.isEqualTo("E"))
+                .build();
+
+        final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
+
+        List<Sequence<String, String>> s = simulate(nfa, ev1, ev3, ev4, ev6, ev8);
+        assertEquals(1, s.size());
+
+        assertNFA(nfa, 2, 1);
+
+        Sequence<String, String> expected =  Sequence.<String, String>newBuilder()
+                .add("latest", ev8)
+                .add("second", ev6)
+                .add("second", ev4)
+                .add("second", ev3)
+                .add("first", ev1)
+                .build(true);
+
+        assertEquals(expected, s.get(0));
+    }
+
+    /**
+     * Pattern : (A;C*; E) / Events : A1, D5
+     *
+     * R1: A1, D5(matched)
+     * R2: _
+     */
+    @Test
+    public void testNFAGivenZeroOrMoreStageWhenNoMatchingInputs() {
+
+        Pattern<String, String> pattern = new QueryBuilder<String, String>()
+                .select("first")
+                    .where(TestMatcher.isEqualTo("A"))
+                    .then()
+                .select("second")
+                    .zeroOrMore()
+                    .where(TestMatcher.isEqualTo("C"))
+                    .then()
+                .select("latest")
+                    .where(TestMatcher.isEqualTo("D"))
+                .build();
+
+        final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
+
+        List<Sequence<String, String>> s = simulate(nfa, ev1, ev5);
+        assertEquals(1, s.size());
+
+        assertNFA(nfa, 2, 1);
+
+        Sequence<String, String> expected =  Sequence.<String, String>newBuilder()
+                .add("latest", ev5)
+                .add("first", ev1)
+                .build(true);
+
+        assertEquals(expected, s.get(0));
+    }
+
+    /**
+     * Pattern : (A;C*; E) / Events : A1, C3, C4, D5
+     *
+     * R1: A1, C3, C4, D5(matched)
+     * R2: _
+     */
+    @Test
+    public void testNFAGivenZeroOrMoreStageWhenMatchingInputs() {
+
+        Pattern<String, String> pattern = new QueryBuilder<String, String>()
+                .select("first")
+                    .where(TestMatcher.isEqualTo("A"))
+                    .then()
+                .select("second")
+                    .zeroOrMore()
+                    .where(TestMatcher.isEqualTo("C"))
+                    .then()
+                .select("latest")
+                    .where(TestMatcher.isEqualTo("D"))
+                .build();
+
+        final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
+
+        List<Sequence<String, String>> s = simulate(nfa, ev1, ev3, ev4, ev5);
+        assertEquals(1, s.size());
+
+        assertNFA(nfa, 2, 1);
+
+        Sequence<String, String> expected =  Sequence.<String, String>newBuilder()
+                .add("latest", ev5)
+                .add("second", ev4)
+                .add("second", ev3)
+                .add("first", ev1)
+                .build(true);
+
+        assertEquals(expected, s.get(0));
+    }
+
+    /**
+     * Pattern : (A;C{2}?; E) / Events : A1, D5
+     *
+     * R1: A1, D5(matched)
+     * R2: _
+     */
+    @Test
+    public void testNFAGivenOptionalExpectingOccurrenceStageWhenNoMatchingInputs() {
+
+        Pattern<String, String> pattern = new QueryBuilder<String, String>()
+                .select("first")
+                    .where(TestMatcher.isEqualTo("A"))
+                    .then()
+                .select("second")
+                    .times(2)
+                    .optional()
+                    .where(TestMatcher.isEqualTo("C"))
+                .then()
+                    .select("latest")
+                    .where(TestMatcher.isEqualTo("D"))
+                .build();
+
+        final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
+
+        List<Sequence<String, String>> s = simulate(nfa, ev1, ev5);
+        assertEquals(1, s.size());
+
+        assertNFA(nfa, 2, 1);
+
+        Sequence<String, String> expected =  Sequence.<String, String>newBuilder()
+                .add("latest", ev5)
+                .add("first", ev1)
+                .build(true);
+
+        assertEquals(expected, s.get(0));
+    }
+
+    /**
+     * Pattern : (A;C{2}?; E) / Events : A1, C3, C4, D5
+     *
+     * R1: A1, C3, C4, D5(matched)
+     * R2: _
+     */
+    @Test
+    public void testNFAGivenOptionalExpectingOccurrenceStageWhenMatchingInputs() {
+
+        Pattern<String, String> pattern = new QueryBuilder<String, String>()
+                .select("first")
+                .where(TestMatcher.isEqualTo("A"))
+                .then()
+                .select("second")
+                .times(2)
+                .optional()
+                .where(TestMatcher.isEqualTo("C"))
+                .then()
+                .select("latest")
+                .where(TestMatcher.isEqualTo("D"))
+                .build();
+
+        final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
+
+        List<Sequence<String, String>> s = simulate(nfa, ev1, ev3, ev4, ev5);
+        assertEquals(1, s.size());
+
+        assertNFA(nfa, 2, 1);
+
+        Sequence<String, String> expected =  Sequence.<String, String>newBuilder()
+                .add("latest", ev5)
+                .add("second", ev4)
+                .add("second", ev3)
+                .add("first", ev1)
+                .build(true);
+
+        assertEquals(expected, s.get(0));
+    }
+
+    /**
+     * Pattern : (A;C{3} E) / Events : A1, C3, C4, D5, C6, E8
+     *
+     * R1: A1, C3, C4, C6, E7 (matched)
+     * R2: _
+     */
+    @Test
+    public void testNFAGivenExpectingOccurrencesStageWhenSkipTilNextMatchContiguityIsUsed() {
+
+        Pattern<String, String> pattern = new QueryBuilder<String, String>()
+                .select("first")
+                    .where(TestMatcher.isEqualTo("A"))
+                    .then()
+                .select("second", Selected.withSkipTilNextMatch())
+                    .times(3)
+                    .where(TestMatcher.isEqualTo("C"))
+                    .then()
+                .select("latest")
+                    .where(TestMatcher.isEqualTo("E"))
+                .build();
+
+        final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
+
+        List<Sequence<String, String>> s = simulate(nfa, ev1, ev3, ev4, ev5, ev6, ev8);
+        assertEquals(1, s.size());
+
+        assertNFA(nfa, 2, 1);
+
+        Sequence<String, String> expected =  Sequence.<String, String>newBuilder()
+                .add("latest", ev8)
+                .add("second", ev6)
+                .add("second", ev4)
+                .add("second", ev3)
+                .add("first", ev1)
                 .build(true);
 
         assertEquals(expected, s.get(0));
@@ -567,7 +796,7 @@ public class NFATest {
                 .build();
 
         final NFA<String, String> nfa = newNFA(pattern, Serdes.String(), Serdes.String());
-        List<Sequence<String, String>> s = simulate(nfa, ev1, ev2, ev3, ev5, ev6);
+        List<Sequence<String, String>> s = simulate(nfa, ev1, ev2, ev3, ev5, ev7);
 
         Assert.assertEquals(4, nfa.getRuns());
 
@@ -598,7 +827,7 @@ public class NFATest {
                 .add("first", ev1)
                 .add("second", ev2)
                 .add("three", ev3)
-                .add("latest", ev6)
+                .add("latest", ev7)
                 .build(false);
 
         assertEquals(expected2, s.get(1));

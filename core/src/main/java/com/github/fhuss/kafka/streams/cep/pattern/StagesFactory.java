@@ -98,7 +98,7 @@ public class StagesFactory<K, V> {
                 Matcher.and(new Matcher.TopicPredicate<>(selected.getTopic()), currentPattern.getPredicate()) :
                 currentPattern.getPredicate();
 
-        EdgeOperation operation = Arrays.asList(ONE, OPTIONAL).contains(cardinality) ? EdgeOperation.BEGIN : EdgeOperation.TAKE;
+        EdgeOperation operation = cardinality.equals(ONE) ? EdgeOperation.BEGIN : EdgeOperation.TAKE;
         stage.addEdge(new Stage.Edge<>(operation, predicate, successorStage));
 
         Matcher<K, V> ignore = null;
@@ -112,18 +112,6 @@ public class StagesFactory<K, V> {
         if (selected.getStrategy().equals(Strategy.SKIP_TIL_NEXT_MATCH)) {
             ignore = Matcher.not(predicate);
             stage.addEdge(new Stage.Edge<>(EdgeOperation.IGNORE, ignore, null));
-        }
-
-        if (cardinality.equals(OPTIONAL)) {
-            if (successorPattern == null && successorStage.isFinalState()) {
-                throw new InvalidPatternException(
-                        "Cannot define a pattern with an optional final stage");
-            }
-
-            Matcher<K, V> successorPredicate = successorPattern.getPredicate();
-            // proceed = successor_begin && !take
-            Matcher<K, V> skip = Matcher.and(successorPredicate, Matcher.not(predicate));
-            stage.addEdge(new Stage.Edge<>(EdgeOperation.SKIP_PROCEED, skip, successorStage));
         }
 
         if (operation.equals(EdgeOperation.TAKE) ) {
@@ -153,16 +141,33 @@ public class StagesFactory<K, V> {
         List<Stage<K, V>> stages = new ArrayList<>();
         stages.add(stage);
         // we need to introduce a required state
-        if (hasMandatoryState) {
-            final Stage internalStage = new Stage<>(nextStageId(), currentPattern.getName(), type);
-            internalStage.addEdge(new Stage.Edge<>(EdgeOperation.BEGIN, currentPattern.getPredicate(), stage));
-            if (ignore != null) {
-                internalStage.addEdge(new Stage.Edge<>(EdgeOperation.IGNORE, ignore, null));
-            }
-            internalStage.setWindow(windowLengthMs); // Pushing the time window early
-            internalStage.setAggregates(currentPattern.getAggregates());
-            stages.add(internalStage);
+        int times = currentPattern.getTimes();
+        if (hasMandatoryState || times > 1) {
+            do {
+                final Stage internalStage = new Stage<>(nextStageId(), currentPattern.getName(), type);
+                internalStage.addEdge(new Stage.Edge<>(EdgeOperation.BEGIN, predicate, stage));
+                if (ignore != null) {
+                    internalStage.addEdge(new Stage.Edge<>(EdgeOperation.IGNORE, ignore, null));
+                }
+                internalStage.setWindow(windowLengthMs); // Pushing the time window early
+                internalStage.setAggregates(currentPattern.getAggregates());
+                stages.add(internalStage);
+                stage = internalStage;
+            } while (--times > 1);
         }
+
+        if (currentPattern.isOptional()) {
+            if (successorPattern == null && successorStage.isFinalState()) {
+                throw new InvalidPatternException(
+                        "Cannot define a pattern with an optional final stage");
+            }
+
+            Matcher<K, V> successorPredicate = successorPattern.getPredicate();
+            // proceed = successor_begin && !take
+            Matcher<K, V> skip = Matcher.and(successorPredicate, Matcher.not(predicate));
+            stage.addEdge(new Stage.Edge<>(EdgeOperation.SKIP_PROCEED, skip, successorStage));
+        }
+
         return stages;
     }
 

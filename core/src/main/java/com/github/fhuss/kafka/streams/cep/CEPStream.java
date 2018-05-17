@@ -17,7 +17,7 @@
 package com.github.fhuss.kafka.streams.cep;
 
 import com.github.fhuss.kafka.streams.cep.pattern.Pattern;
-import com.github.fhuss.kafka.streams.cep.pattern.PredicateBuilder;
+import com.github.fhuss.kafka.streams.cep.pattern.PatternBuilder;
 import org.apache.kafka.streams.kstream.KStream;
 
 /**
@@ -34,7 +34,7 @@ public interface CEPStream<K, V> {
      * @param builder       the builder to builder the pattern to query.
      * @return a {@link KStream} that contains only those records that satisfy the given pattern with unmodified keys and new values.
      */
-    default KStream<K, Sequence<K, V>> query(final String queryName,  final PredicateBuilder<K, V> builder) {
+    default KStream<K, Sequence<K, V>> query(final String queryName,  final PatternBuilder<K, V> builder) {
         return query(queryName, builder, null);
     }
 
@@ -46,7 +46,7 @@ public interface CEPStream<K, V> {
      * @return a {@link KStream} that contains only those records that satisfy the given pattern with unmodified keys and new values.
      */
     default KStream<K, Sequence<K, V>> query(final String queryName,
-                                     final PredicateBuilder<K, V> builder,
+                                     final PatternBuilder<K, V> builder,
                                      final Queried<K, V> queried) {
         return query(queryName, builder.build(), queried);
     }

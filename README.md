@@ -130,6 +130,13 @@ QueryBuilder<String, Integer> builder = new QueryBuilder<>();
         </td>
     </tr>
     <tr>
+        <td><pre lang="java">times(#ofTimes)</pre></td>
+        <td>
+            <p>Defines that a specific number of events should match this pattern.</p>
+            <pre lang="java">builder.time(3)</pre>
+        </td>
+    </tr>
+    <tr>
         <td><pre lang="java">where(Matcher)</pre></td>
         <td>
 <p>Defines the condition under which an event should be selected to be added to the pattern sequence.</p>

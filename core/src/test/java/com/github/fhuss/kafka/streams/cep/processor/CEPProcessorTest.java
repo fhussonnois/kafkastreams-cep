@@ -18,7 +18,7 @@ package com.github.fhuss.kafka.streams.cep.processor;
 
 import com.github.fhuss.kafka.streams.cep.nfa.Stages;
 import com.github.fhuss.kafka.streams.cep.pattern.Pattern;
-import com.github.fhuss.kafka.streams.cep.pattern.PredicateBuilder;
+import com.github.fhuss.kafka.streams.cep.pattern.PatternBuilder;
 import com.github.fhuss.kafka.streams.cep.pattern.QueryBuilder;
 import com.github.fhuss.kafka.streams.cep.pattern.StagesFactory;
 import com.github.fhuss.kafka.streams.cep.state.AggregatesStore;
@@ -49,7 +49,7 @@ public class CEPProcessorTest {
     private static final String DEFAULT_STRING_VALUE = "value";
     private static final String TEST_QUERY           = "test-query";
 
-    private static final PredicateBuilder<String, String> PATTERN =  new QueryBuilder<String, String>()
+    private static final PatternBuilder<String, String> PATTERN =  new QueryBuilder<String, String>()
             .select()
             .where((event) -> true);
 
