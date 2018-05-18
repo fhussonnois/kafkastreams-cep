@@ -35,7 +35,8 @@ public class Stages<K, V> implements Iterable<Stage<K, V>> {
 
     /**
      * Creates a new {@link Stages} instance.
-     * @param stages
+     *
+     * @param stages    the list of stages.
      */
     public Stages(final List<Stage<K, V>> stages) {
         this.stages = stages;

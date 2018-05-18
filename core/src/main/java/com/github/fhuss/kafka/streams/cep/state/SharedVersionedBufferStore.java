@@ -58,7 +58,7 @@ public interface SharedVersionedBufferStore<K , V> extends StateStore {
     /**
      * Retrieves the complete event sequence for the specified final event.
      *
-     * @param matched
+     * @param matched the sequence of matching events.
      * @param version the final dewey version of the sequence.
      * @return a new {@link Sequence} instance.
      */
@@ -67,9 +67,8 @@ public interface SharedVersionedBufferStore<K , V> extends StateStore {
     /**
      * Remove all events attached to a sequence.
      *
-     * @param matched the final event of the sequence.
+     * @param matched the sequence of matching events.
      * @param version the final dewey version of the sequence.
-     *
      * @return the previous sequence associated with state, event and version, or null if there was no sequence for that.
      */
     Sequence<K, V> remove(final Matched matched, final DeweyVersion version);

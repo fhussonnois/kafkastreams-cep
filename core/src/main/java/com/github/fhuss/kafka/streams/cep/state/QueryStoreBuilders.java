@@ -24,6 +24,8 @@ import org.apache.kafka.streams.state.KeyValueBytesStoreSupplier;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
 
+import java.util.Objects;
+
 /**
  * Helpers class to build required stores.
  *
@@ -40,8 +42,12 @@ public class QueryStoreBuilders<K, V> {
 
     /**
      * Creates a new {@link QueryStoreBuilders} instance.
+     * @param queryName the complex query name.
+     * @param pattern   the complex pattern.
      */
     public QueryStoreBuilders(final String queryName, final Pattern<K, V> pattern) {
+        Objects.requireNonNull(queryName, "queryName cannot be null");
+        Objects.requireNonNull(pattern, "pattern cannot be null");
         this.queryName = queryName;
         this.factory = new StagesFactory<>();
         this.stages = factory.make(pattern);

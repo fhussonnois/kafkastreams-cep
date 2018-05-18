@@ -16,7 +16,12 @@
  */
 package com.github.fhuss.kafka.streams.cep.pattern;
 
-
+/**
+ * Default class to build a new complex event query.
+ *
+ * @param <K>   the record key type.
+ * @param <V>   the record value type.
+ */
 public class QueryBuilder<K, V> {
 
     private static final Selected DEFAULT_SELECT_STRATEGY = Selected.withStrictContiguity();
@@ -42,7 +47,7 @@ public class QueryBuilder<K, V> {
 
     /**
      * Creates a new stage with no name.
-     *
+     * @param selected  the instance of {@link Selected} used to define optional parameters
      * @return a new {@link StageBuilder}.
      */
     public StageBuilder<K, V> select(final Selected selected) {

@@ -36,7 +36,11 @@ import org.slf4j.LoggerFactory;
 /**
  * A shared version buffer implementation based on Kafka Streams {@link KeyValueStore}.
  *
- * Implementation based on https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
+ * The implementation is based on the paper "Efficient Pattern Matching over Event Streams".
+ * @see <a href="https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf">https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf</a>
+ *
+ * @param <K>   the record key type.
+ * @param <V>   the record value type.
  */
 public class SharedVersionedBufferStoreImpl<K , V>  extends WrappedStateStore.AbstractStateStore implements SharedVersionedBufferStore<K, V> {
 
@@ -54,9 +58,10 @@ public class SharedVersionedBufferStoreImpl<K , V>  extends WrappedStateStore.Ab
     /**
      * Creates a new {@link SharedVersionedBufferStoreImpl} instance.
      *
-     * @param bytesStore the kafka processor context.
+     * @param bytesStore    the bytes store.
+     * @param keySerde      the serde used for key.
+     * @param valueSerde    the serde used to value.
      */
-    @SuppressWarnings("unchecked")
     public SharedVersionedBufferStoreImpl(
             final KeyValueStore<Bytes, byte[]> bytesStore,
             final Serde<K> keySerde,

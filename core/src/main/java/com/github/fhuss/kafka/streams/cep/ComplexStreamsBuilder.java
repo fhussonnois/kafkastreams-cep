@@ -49,7 +49,12 @@ public class ComplexStreamsBuilder {
     }
 
     /**
-     * Create a {@link CEPStream} from the specified topic {@link StreamsBuilder#stream(Collection, Consumed)}
+     * Create a {@link CEPStream} from the specified topic.
+     *
+     * @param topics    {@link StreamsBuilder#stream(Collection, Consumed)}
+     * @param consumed  {@link StreamsBuilder#stream(Collection, Consumed)}
+     * @param <K>       the record key type.
+     * @param <V>       the record value type.
      *
      * @return a {@link CEPStream} for the specified topics
      */
@@ -59,8 +64,12 @@ public class ComplexStreamsBuilder {
     }
 
     /**
-     * Create a {@link CEPStream} from the specified topic {@link StreamsBuilder#stream(String, Consumed)}
+     * Create a {@link CEPStream} from the specified topic.
      *
+     * @param topic     {@link StreamsBuilder#stream(String, Consumed)}
+     * @param consumed  {@link StreamsBuilder#stream(String, Consumed)}
+     * @param <K>       the record key type.
+     * @param <V>       the record value type.
      * @return a {@link CEPStream} for the specified topics
      */
     public <K, V> CEPStream<K, V> stream(final String topic,
@@ -69,8 +78,11 @@ public class ComplexStreamsBuilder {
     }
 
     /**
-     * Create a {@link CEPStream} from the specified topic {@link StreamsBuilder#stream(String)}.
+     * Create a {@link CEPStream} from the specified topic.
      *
+     * @param topic     {@link StreamsBuilder#stream(String)}
+     * @param <K>       the record key type.
+     * @param <V>       the record value type.
      * @return a {@link CEPStream} for the specified topic
      */
     public <K, V> CEPStream<K, V> stream(final String topic) {
@@ -80,9 +92,12 @@ public class ComplexStreamsBuilder {
     /**
      * Create a {@link CEPStream} from the specified {@link KStream}.
      *
+     * @param stream the instance of KStream to extend.
+     * @param <K>    the record key type.
+     * @param <V>    the record value type.
      * @return a {@link CEPStream} for the specified stream.
      */
-    public <K, V> CEPStream<K, V> stream(KStream<K, V> stream) {
+    public <K, V> CEPStream<K, V> stream(final KStream<K, V> stream) {
         return new CEPStreamImpl<>(stream);
     }
 

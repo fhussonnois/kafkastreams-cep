@@ -27,15 +27,24 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * Default {@link Serde} implementation class used for {@link MatchedEvent}.
+ * 
+ * @param <K>   the record key type.
+ * @param <V>   the record value type.
+ */
 public class MatchedEventSerde<K, V>  implements Serde<MatchedEvent<K, V>>  {
 
     private MatchedEventSerdes serdes;
 
     /**
      * Creates a new {@link MatchedEventSerde} instance.
+     *
+     * @param keySerde   the record key serde
+     * @param valueSerde the record value serde.
      */
-    public MatchedEventSerde(final Serde<K> keys, final Serde<V> values) {
-        this.serdes = new MatchedEventSerdes(keys, values);
+    public MatchedEventSerde(final Serde<K> keySerde, final Serde<V> valueSerde) {
+        this.serdes = new MatchedEventSerdes(keySerde, valueSerde);
     }
 
     @Override

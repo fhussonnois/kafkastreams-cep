@@ -18,18 +18,16 @@ package com.github.fhuss.kafka.streams.cep.state;
 
 import com.github.fhuss.kafka.streams.cep.state.internal.Aggregated;
 import org.apache.kafka.streams.processor.StateStore;
-import org.apache.kafka.streams.state.KeyValueStore;
 
 /**
- *  Interface for storing the aggregated values of pattern sequences.
+ * Interface for storing the aggregated values of pattern sequences.
+ * 
+ * @param <K>   the record key type
  */
 public interface AggregatesStore<K> extends StateStore {
 
     <T> T find(final Aggregated<K> aggregated);
 
-    /**
-     * {@link KeyValueStore#put(Object, Object)}.
-     */
     <T> void put(final Aggregated<K> aggregated, final T aggregate);
 
     void branch(final Aggregated<K> aggregated, final long sequence);

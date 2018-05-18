@@ -33,7 +33,6 @@ public interface SimpleMatcher<K, V> extends Matcher<K, V> {
 
     /**
      * {@inheritDoc}
-     * @param context
      */
     @Override
     default boolean accept(final MatcherContext<K, V> context) {

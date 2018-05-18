@@ -18,6 +18,11 @@ package com.github.fhuss.kafka.streams.cep;
 
 import org.apache.kafka.common.serialization.Serde;
 
+/**
+ *
+ * @param <K>   the record key type.
+ * @param <V>   the record value type.
+ */
 public class Queried<K, V> {
 
     private Serde<K> keySerde;
@@ -25,14 +30,25 @@ public class Queried<K, V> {
 
     /**
      * Creates a new {@link Queried} instance.
-     * @param keySerde
-     * @param valueSerde
+     *
+     * @param keySerde      the record key serde
+     * @param valueSerde    the record value serde
      */
     private Queried(final Serde<K> keySerde, final Serde<V> valueSerde) {
         this.keySerde = keySerde;
         this.valueSerde = valueSerde;
     }
 
+    /**
+     * Create an instance of {@code Queried} with  a key {@link Serde} and a value {@link Serde}.
+     * {@code null} values are accepted and will be replaced by the default key serde as defined in config.
+     *
+     * @param keySerde      the record key serde
+     * @param valueSerde    the record value serde
+     * @param <K>   the record key type.
+     * @param <V>   the record value type.
+     * @return new {@code Queried} instance configured with the keySerde and valueSerde
+     */
     public static <K, V> Queried<K, V> with(final Serde<K> keySerde, final Serde<V> valueSerde) {
         return new Queried<>(keySerde, valueSerde);
     }
@@ -42,8 +58,8 @@ public class Queried<K, V> {
      * {@code null} values are accepted and will be replaced by the default key serde as defined in config.
      *
      * @param keySerde the key serde to use. If {@code null} the default key serde from config will be used
-     * @param <K>      key type
-     * @param <V>      value type
+     * @param <K>   the record key type.
+     * @param <V>   the record value type.
      * @return new {@code Queried} instance configured with the keySerde
      */
     public static <K, V> Queried<K, V> keySerde(final Serde<K> keySerde) {
@@ -55,8 +71,8 @@ public class Queried<K, V> {
      * {@code null} values are accepted and will be replaced by the default value serde as defined in config.
      *
      * @param valueSerde the value serde to use. If {@code null} the default value serde from config will be used
-     * @param <K>        key type
-     * @param <V>        value type
+     * @param <K>   the record key type.
+     * @param <V>   the record value type.
      * @return new {@code Queried} instance configured with the valueSerde
      */
     public static <K, V> Queried<K, V> valueSerde(final Serde<V> valueSerde) {

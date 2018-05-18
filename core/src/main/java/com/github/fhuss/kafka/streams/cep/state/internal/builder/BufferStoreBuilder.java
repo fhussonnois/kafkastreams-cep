@@ -27,13 +27,16 @@ import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
 
+/**
+ * Default class to build {@link SharedVersionedBufferStore} instance.
+ *
+ * @param <K> the type of keys
+ * @param <V> the type of values
+ */
 public class BufferStoreBuilder<K, V> extends AbstractStoreBuilder<K, V, SharedVersionedBufferStore<K, V>> {
 
     private final KeyValueBytesStoreSupplier storeSupplier;
 
-    /**
-     * Creates a new {@link BufferStoreBuilder} instance.
-     */
     public BufferStoreBuilder(final KeyValueBytesStoreSupplier storeSupplier,
                               final Serde<K> keySerde,
                               final Serde<V> valueSerde,

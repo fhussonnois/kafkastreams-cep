@@ -50,6 +50,7 @@ public class States<K> {
      * Retrieve the value state for the specified key.
      *
      * @param state the state name.
+     * @param <T> the of default value.
      * @return <code>null</code> if no state exists for the given key.
      */
     public <T> T get(final String state) {

@@ -41,8 +41,12 @@ public class Event<K, V> implements Comparable<Event<K, V>> {
     /**
      * Creates a new {@link Event} instance.
      *
-     * @param key the key for the message
-     * @param value the value for the message
+     * @param key       the record key
+     * @param value     the record value
+     * @param timestamp the record timestamp
+     * @param topic     the record topic
+     * @param partition the record partition
+     * @param offset    the record offset
      */
     public Event(final K key,
                  final V value,

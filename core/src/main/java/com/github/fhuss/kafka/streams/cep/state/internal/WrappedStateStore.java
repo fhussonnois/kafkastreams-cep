@@ -16,7 +16,6 @@
  */
 package com.github.fhuss.kafka.streams.cep.state.internal;
 
-import org.apache.kafka.streams.errors.InvalidStateStoreException;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.StateStore;
 
@@ -24,19 +23,6 @@ import org.apache.kafka.streams.processor.StateStore;
  * A storage engine wrapper for utilities like logging, caching, and metering.
  */
 public interface WrappedStateStore extends StateStore {
-
-    /**
-     * Return the inner most storage engine
-     *
-     * @return wrapped inner storage engine
-     */
-    StateStore inner();
-
-    /**
-     * Return the state store this store directly wraps
-     * @return
-     */
-    StateStore wrappedStore();
 
     abstract class AbstractStateStore implements org.apache.kafka.streams.state.internals.WrappedStateStore {
         final StateStore innerState;
@@ -63,12 +49,6 @@ public interface WrappedStateStore extends StateStore {
         @Override
         public boolean isOpen() {
             return innerState.isOpen();
-        }
-
-        void validateStoreOpen() {
-            if (!innerState.isOpen()) {
-                throw new InvalidStateStoreException("Store " + innerState.name() + " is currently closed.");
-            }
         }
 
         @Override

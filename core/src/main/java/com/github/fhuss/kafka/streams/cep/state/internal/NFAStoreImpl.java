@@ -43,13 +43,6 @@ public class NFAStoreImpl<K, V> extends WrappedStateStore.AbstractStateStore imp
     private final Serde<K> keySerde;
     private final Serde<V> valueSerde;
 
-    /**
-     * Creates a new {@link NFAStoreImpl} instance.
-     * @param bytesStore
-     * @param stages
-     * @param keySerde
-     * @param valueSerde
-     */
     public NFAStoreImpl(final KeyValueStore<Bytes, byte[]> bytesStore,
                         final List<Stage<K, V>> stages,
                         final Serde<K> keySerde,

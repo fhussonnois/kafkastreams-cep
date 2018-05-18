@@ -35,11 +35,6 @@ public class AggregatesStoreImpl<K> extends WrappedStateStore.AbstractStateStore
 
     private String topic;
 
-
-    /**
-     * Creates a new {@link AggregatesStoreImpl} instance.
-     * @param bytesStore
-     */
     public AggregatesStoreImpl(final KeyValueStore<Bytes, byte[]> bytesStore) {
         super(bytesStore);
         this.bytesStore = bytesStore;

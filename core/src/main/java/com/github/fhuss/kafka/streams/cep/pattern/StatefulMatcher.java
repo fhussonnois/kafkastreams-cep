@@ -30,7 +30,6 @@ public interface StatefulMatcher<K, V> extends Matcher<K, V> {
 
     /**
      * {@inheritDoc}
-     * @param context
      */
     @Override
     default boolean accept(MatcherContext<K, V> context) {

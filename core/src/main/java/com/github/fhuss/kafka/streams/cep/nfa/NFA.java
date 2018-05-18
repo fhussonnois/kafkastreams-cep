@@ -78,19 +78,29 @@ public class NFA<K, V> implements Serializable {
         return new NFA<>(aggregatesStore, sharedVersionedBuffer, stages.getDefinedStates(), queue);
     }
 
-
     /**
      * Creates a new {@link NFA} instance.
+     *
+     * @param aggregatesStore       the instance of AggregateStore to used.
+     * @param sharedVersionedBuffer the instance of sharedVersionedBuffer to used.
+     * @param aggregatesName        the list of aggregate names.
+     * @param computationStages     the queue of stages to compute.
      */
     public NFA(final AggregatesStore<K> aggregatesStore,
-               final SharedVersionedBufferStore<K, V> sharedVersionedBuffer,
-               final Set<String> aggregatesName,
-               final Queue<ComputationStage<K, V>> computationStages) {
+                final SharedVersionedBufferStore<K, V> sharedVersionedBuffer,
+                final Set<String> aggregatesName,
+                final Queue<ComputationStage<K, V>> computationStages) {
         this(aggregatesStore, sharedVersionedBuffer, aggregatesName, computationStages, INITIAL_RUNS);
     }
 
     /**
      * Creates a new {@link NFA} instance.
+     *
+     * @param aggregatesStore       the instance of AggregateStore to used.
+     * @param sharedVersionedBuffer the instance of sharedVersionedBuffer to used.
+     * @param aggregatesName        the list of aggregate names.
+     * @param computationStages     the queue of stages to compute.
+     * @param runs                  the current runs
      */
     public NFA(final AggregatesStore<K> aggregatesStore,
                final SharedVersionedBufferStore<K, V> sharedVersionedBuffer,
@@ -118,7 +128,8 @@ public class NFA<K, V> implements Serializable {
     /**
      * Process the message with the given key and value.
      *
-     * @param event the event to match.
+     * @param   event the event to match.
+     * @return  sequences of matching events.
      */
     public List<Sequence<K, V>> matchPattern(final Event<K, V> event) {
 

@@ -1,9 +1,7 @@
 package com.github.fhuss.kafka.streams.cep.state;
 
-import com.github.fhuss.kafka.streams.cep.Event;
 import com.github.fhuss.kafka.streams.cep.Sequence;
 import com.github.fhuss.kafka.streams.cep.nfa.DeweyVersion;
-import com.github.fhuss.kafka.streams.cep.nfa.Stage;
 import com.github.fhuss.kafka.streams.cep.state.internal.Matched;
 
 public class ReadOnlySharedVersionBuffer<K, V> {
@@ -12,7 +10,7 @@ public class ReadOnlySharedVersionBuffer<K, V> {
 
     /**
      * Creates a new {@link ReadOnlySharedVersionBuffer} instance.
-     * @param store
+     * @param store the inner instance of {@link SharedVersionedBufferStore}.
      */
     public ReadOnlySharedVersionBuffer(final SharedVersionedBufferStore<K, V> store) {
         this.store = store;

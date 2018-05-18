@@ -92,8 +92,9 @@ public class ComputationStage<K, V> {
 
     /**
      * Creates a new {@link ComputationStage} for the specified {@link DeweyVersion}.
-     * @param version
-     * @return
+     *
+     * @param version   the new version
+     * @return a new {@link ComputationStage} instance.
      */
     public ComputationStage<K, V> setVersion(final DeweyVersion version) {
         return new ComputationStageBuilder<K, V>()
@@ -122,9 +123,6 @@ public class ComputationStage<K, V> {
         return stage.getWindowMs() != -1 && (time - timestamp) > stage.getWindowMs();
     }
 
-    /**
-     * @see {@link Stage#isBeginState()}.
-     */
     public boolean isBeginState() {
         return stage.isBeginState();
     }
@@ -140,6 +138,7 @@ public class ComputationStage<K, V> {
 
     /**
      * Checks whether this {@link ComputationStage} is forwarding to the final state.
+     * @return <code>true</code> if is forwarding to the final state.
      */
     boolean isForwardingToFinalState() {
         List<Stage.Edge<K, V>> edges = stage.getEdges();

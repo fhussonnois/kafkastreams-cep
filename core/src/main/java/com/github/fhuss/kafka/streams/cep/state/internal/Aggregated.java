@@ -18,6 +18,11 @@ package com.github.fhuss.kafka.streams.cep.state.internal;
 
 import java.util.Objects;
 
+/**
+ * Class for aggregated state.
+ *
+ * @param <K>   the record key type.
+ */
 public class Aggregated<K> {
 
     private final K key;
@@ -26,8 +31,8 @@ public class Aggregated<K> {
 
     /**
      * Creates a new {@link Aggregated} instance.
-     * @param key
-     * @param aggregate
+     * @param key       the record key
+     * @param aggregate the instance of {@link Aggregate}.
      */
     public Aggregated(final K key, final Aggregate aggregate) {
         this.key = key;

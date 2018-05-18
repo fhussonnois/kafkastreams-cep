@@ -27,6 +27,12 @@ import java.util.Objects;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+/**
+ * A completed sequence of matching events.
+ *
+ * @param <K>   the record key type.
+ * @param <V>   the record value type.
+ */
 public class Sequence<K, V> implements Iterable<Event<K, V>> {
 
     private Collection<Staged<K, V>> matched;
@@ -36,7 +42,7 @@ public class Sequence<K, V> implements Iterable<Event<K, V>> {
     /**
      * Creates a new {@link Sequence} instance.
      *
-     * @param matched
+     * @param matched   list of matching stages.
      */
     public Sequence(final Collection<Staged<K, V>> matched) {
         this.matched = matched;
@@ -44,17 +50,20 @@ public class Sequence<K, V> implements Iterable<Event<K, V>> {
     }
     /**
      * Returns the all events that match the specified stage.
-     * @param stage the name of the stage.
+     *
+     * @param   stage the name of the stage.
+     * @return  the staged instance or <code>null</code>.
      */
-    public Staged<K, V> getByName(String stage) {
+    public Staged<K, V> getByName(final String stage) {
         return this.indexed.get(stage);
     }
 
     /**
      * Returns the all events that match the specified stage.
-     * @param stage the index of the stage.
+     * @param   stage the index of the stage.
+     * @return  the staged instance or <code>null</code>.
      */
-    public Staged<K, V> getByIndex(int stage) {
+    public Staged<K, V> getByIndex(final int stage) {
         return new ArrayList<>(this.matched).get(stage);
     }
 
@@ -64,7 +73,8 @@ public class Sequence<K, V> implements Iterable<Event<K, V>> {
     }
 
     /**
-     * Returns the number of events contains into this sequence.
+     * Returns the number of matching events contains into this sequence.
+     * @return number of matching events.
      */
     public long size() {
         return matched
@@ -72,6 +82,9 @@ public class Sequence<K, V> implements Iterable<Event<K, V>> {
                 .mapToInt(s -> s.getEvents().size()).sum();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -80,16 +93,25 @@ public class Sequence<K, V> implements Iterable<Event<K, V>> {
         return Objects.equals(new ArrayList<>(this.matched), that.matched);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public int hashCode() {
         return Objects.hash(matched);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String toString() {
         return matched.toString();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Iterator<Event<K, V>> iterator() {
         LinkedList<Event<K, V>> l = new LinkedList<>();
@@ -99,6 +121,12 @@ public class Sequence<K, V> implements Iterable<Event<K, V>> {
         return l.iterator();
     }
 
+    /**
+     * A completed stage of matching events.
+     *
+     * @param <K>   the record key type.
+     * @param <V>   the record value type.
+     */
     public static class Staged<K, V> {
 
         private final String stage;

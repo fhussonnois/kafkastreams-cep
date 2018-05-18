@@ -30,15 +30,18 @@ import org.apache.kafka.streams.state.Stores;
 
 import java.util.List;
 
+/**
+ * Default class to build {@link NFAStore} instance.
+ *
+ * @param <K> the type of keys
+ * @param <V> the type of values
+ */
 public class NFAStoreBuilder<K, V> extends AbstractStoreBuilder<K, V, NFAStore<K, V>> {
 
     private final KeyValueBytesStoreSupplier storeSupplier;
 
     private final List<Stage<K, V>> stages;
 
-    /**
-     * Creates a new {@link NFAStoreBuilder} instance.
-     */
     public NFAStoreBuilder(final KeyValueBytesStoreSupplier storeSupplier,
                            final List<Stage<K, V>> stages,
                            final Serde<K> keySerde,

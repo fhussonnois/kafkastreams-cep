@@ -32,6 +32,12 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 
+/**
+ * Default class used for extend {@link KStream} instance with CEP features.
+ *
+ * @param <K>   the record key type.
+ * @param <V>   the record value type.
+ */
 public class CEPStreamImpl<K, V> extends AbstractStream<K> implements CEPStream<K, V> {
 
     private static final Logger LOG = LoggerFactory.getLogger(CEPStreamImpl.class);
@@ -40,7 +46,7 @@ public class CEPStreamImpl<K, V> extends AbstractStream<K> implements CEPStream<
 
     /**
      * Creates a new {@link CEPStreamImpl} instance.
-     * @param stream
+     * @param stream the instance of {@link KStreamImpl} to used.
      */
     @SuppressWarnings("unchecked")
     public CEPStreamImpl(final KStream<K, V> stream) {
@@ -50,7 +56,7 @@ public class CEPStreamImpl<K, V> extends AbstractStream<K> implements CEPStream<
 
     /**
      * Creates a new {@link CEPStreamImpl} instance.
-     * @param stream
+     * @param stream the instance of {@link KStreamImpl} to used.
      */
     private CEPStreamImpl(final KStreamImpl<K, V> stream) {
         super(stream);

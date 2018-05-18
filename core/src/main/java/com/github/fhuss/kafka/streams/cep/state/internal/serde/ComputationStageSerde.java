@@ -24,6 +24,7 @@ import com.github.fhuss.kafka.streams.cep.nfa.ComputationStageBuilder;
 import com.github.fhuss.kafka.streams.cep.nfa.DeweyVersion;
 import com.github.fhuss.kafka.streams.cep.nfa.EdgeOperation;
 import com.github.fhuss.kafka.streams.cep.nfa.Stage;
+import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
 
@@ -33,18 +34,27 @@ import java.util.Queue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 
-
-public class ComputationStageSerde<K, V>  extends AbstractKryoSerde<Queue<ComputationStage<K, V>>, K, V> {
+/**
+ * The default {@link Serializer} and {@link Deserializer} used for {@link ComputationStage}.
+ * 
+ * @param <K>   the record key type.
+ * @param <V>   the record value type.
+ */
+public class ComputationStageSerde<K, V> extends AbstractKryoSerde<Queue<ComputationStage<K, V>>, K, V> {
 
     private Map<Integer, Stage<K, V>> stagesKeyedById;
 
     /**
      * Creates a new {@link ComputationStageSerde} instance.
+     *
+     * @param stages    the list of {@link Stage} instance.
+     * @param keySerde      the serde to used for record key.
+     * @param valueSerde    the serde to used for record value.
      */
     public ComputationStageSerde(final List<Stage<K, V>> stages,
-                                 final Serde<K> keys,
-                                 final Serde<V> values) {
-        super(keys, values);
+                                 final Serde<K> keySerde,
+                                 final Serde<V> valueSerde) {
+        super(keySerde, valueSerde);
         this.stagesKeyedById = stages.stream().collect(Collectors.toMap(Stage::getId, s -> s));
     }
 

@@ -15,6 +15,9 @@ import com.github.fhuss.kafka.streams.cep.state.internal.Matched;
 @FunctionalInterface
 public interface SequenceMatcher<K, V> extends Matcher<K, V> {
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     default boolean accept(final MatcherContext<K, V> context) {
         ReadOnlySharedVersionBuffer<K, V> buffer = context.getBuffer();

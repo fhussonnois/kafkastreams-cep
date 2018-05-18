@@ -57,7 +57,7 @@ public class QueryStores {
      * @param supplier      a {@link KeyValueBytesStoreSupplier}
      * @param <K>           key type
      * @return an instance of {@link StoreBuilder} than can build a {@link AggregatesStore}
-     * */
+     **/
     public static <K> StoreBuilder<AggregatesStore<K>> aggregatesStoreBuilder(final KeyValueBytesStoreSupplier supplier) {
         return new AggregatesStoreBuilder<>(supplier, Time.SYSTEM);
     }
@@ -65,10 +65,13 @@ public class QueryStores {
     /**
      * Creates a {@link StoreBuilder} that can be used to build a {@link AggregatesStore}.
      *
-     * @param supplier      a {@link KeyValueBytesStoreSupplier}
-     * @param <K>           key type
+     * @param supplier      the instance of {@link KeyValueBytesStoreSupplier} to use
+     * @param keySerde      the key serde
+     * @param valSerde      the value serde
+     * @param <K>           the type of keys
+     * @param <V>           the type of values
      * @return an instance of {@link StoreBuilder} than can build a {@link AggregatesStore}
-     * */
+     **/
     public static <K, V> StoreBuilder<SharedVersionedBufferStore<K, V>> bufferStoreBuilder(
             final KeyValueBytesStoreSupplier supplier,
             final Serde<K> keySerde,
@@ -79,8 +82,12 @@ public class QueryStores {
     /**
      * Creates a {@link StoreBuilder} that can be used to build a {@link AggregatesStore}.
      *
-     * @param supplier      a {@link KeyValueBytesStoreSupplier}
-     * @param <K>           key type
+     * @param supplier      the instance of {@link KeyValueBytesStoreSupplier} to use
+     * @param stages        the list of {@link Stage} instance.
+     * @param keySerde      the key serde
+     * @param valSerde      the value serde
+     * @param <K>           the type of keys
+     * @param <V>           the type of values
      * @return an instance of {@link StoreBuilder} than can build a {@link AggregatesStore}
      * */
     public static <K, V> NFAStoreBuilder<K, V> nfaStoreBuilder(

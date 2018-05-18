@@ -22,6 +22,12 @@ import com.github.fhuss.kafka.streams.cep.nfa.Stage;
 import com.github.fhuss.kafka.streams.cep.state.ReadOnlySharedVersionBuffer;
 import com.github.fhuss.kafka.streams.cep.state.States;
 
+/**
+ * The context used to matching an event.
+ *
+ * @param <K>   the record key type.
+ * @param <V>   the record value type.
+ */
 public class MatcherContext<K, V> {
 
     private final ReadOnlySharedVersionBuffer<K, V> buffer;
@@ -32,9 +38,6 @@ public class MatcherContext<K, V> {
     private final Event<K, V> currentEvent;
     private final States<K> states;
 
-    /**
-     * Creates a new {@link MatcherContext} instance.
-     */
     public MatcherContext(final ReadOnlySharedVersionBuffer<K, V> buffer,
                           final DeweyVersion version,
                           final Stage<K, V> previousStage,

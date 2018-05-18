@@ -26,6 +26,12 @@ import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
 
+/**
+ * Default class to build {@link AggregatesStore} instance.
+ *
+ * @param <K> the type of keys
+ * @param <V> the type of values
+ */
 public class AggregatesStoreBuilder<K, V> extends AbstractStoreBuilder<K, V, AggregatesStore<K>> {
 
     private final KeyValueBytesStoreSupplier storeSupplier;

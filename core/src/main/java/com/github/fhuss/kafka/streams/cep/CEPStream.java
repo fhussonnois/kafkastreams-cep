@@ -42,7 +42,7 @@ public interface CEPStream<K, V> {
      *
      * @param queryName     the query name.
      * @param builder       the builder to builder the pattern to query.
-     * @param queried
+     * @param queried       the queried object.
      * @return a {@link KStream} that contains only those records that satisfy the given pattern with unmodified keys and new values.
      */
     default KStream<K, Sequence<K, V>> query(final String queryName,
@@ -66,7 +66,7 @@ public interface CEPStream<K, V> {
      *
      * @param queryName     the query name.
      * @param pattern       the pattern to query.
-     * @param queried
+     * @param queried       the queried object.
      * @return a {@link KStream} that contains only those records that satisfy the given pattern with unmodified keys and new values.
      */
     KStream<K, Sequence<K, V>> query(final String queryName,

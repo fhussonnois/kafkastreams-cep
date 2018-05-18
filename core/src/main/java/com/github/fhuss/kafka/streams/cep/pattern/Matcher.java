@@ -31,6 +31,9 @@ public interface Matcher<K, V> {
 
     /**
      * The function that evaluates an input record stream.
+     *
+     * @param context  the matching context.
+     * @return         <code>true</code> if the event match tu current predicate.
      */
     boolean accept(final MatcherContext<K, V> context);
 
@@ -54,6 +57,9 @@ public interface Matcher<K, V> {
             this.predicate = predicate;
         }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public boolean accept(MatcherContext<K, V> context) {
             return ! this.predicate.accept(context);
@@ -71,7 +77,6 @@ public interface Matcher<K, V> {
 
         /**
          * {@inheritDoc}
-         * @param context
          */
         @Override
         public boolean accept(final MatcherContext<K, V> context) {
@@ -90,7 +95,6 @@ public interface Matcher<K, V> {
 
         /**
          * {@inheritDoc}
-         * @param context
          */
         @Override
         public boolean accept(final MatcherContext<K, V> context) {
