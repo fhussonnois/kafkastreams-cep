@@ -7,26 +7,16 @@
     <modules>
         <module>core</module>
         <module>example</module>
+        <module>streams</module>
     </modules>
     
     <groupId>com.github.fhuss</groupId>
-    <artifactId>kafka-streams-cep-parent</artifactId>
+    <artifactId>streams-cep-reactor</artifactId>
     <version>1.1.0-SNAPSHOT</version>
-    <name>kafka-streams-cep-parent</name>
-    <packaging>pom</packaging>
 
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
+    <name>Streams CEP Reactor POM</name>
+
+    <packaging>pom</packaging>
 
     <licenses>
         <license>
@@ -55,6 +45,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <kafka.version>1.1.0</kafka.version>
         <logback.version>1.1.3</logback.version>
     </properties>
@@ -65,6 +56,19 @@
             <url>http://packages.confluent.io/maven/</url>
         </repository>
     </repositories>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.0</version>
+                <configuration>
+                    <release>11</release>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
     <dependencyManagement>
         <dependencies>
@@ -97,13 +101,6 @@
 
             <dependency>
                 <groupId>org.apache.kafka</groupId>
-                <artifactId>kafka_2.12</artifactId>
-                <version>${kafka.version}</version>
-                <scope>provided</scope>
-            </dependency>
-
-            <dependency>
-                <groupId>org.apache.kafka</groupId>
                 <artifactId>kafka-clients</artifactId>
                 <version>${kafka.version}</version>
                 <scope>provided</scope>
@@ -116,6 +113,21 @@
                 <classifier>test</classifier>
                 <scope>test</scope>
             </dependency>
+
+            <dependency>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <version>4.11</version>
+                <scope>test</scope>
+            </dependency>
+
+            <!-- START dependencies for logging -->
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>1.7.28</version>
+            </dependency>
+            <!-- END dependencies for logging -->
 
         </dependencies>
     </dependencyManagement>

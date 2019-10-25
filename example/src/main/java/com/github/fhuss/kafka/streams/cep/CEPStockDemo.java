@@ -16,6 +16,7 @@
  */
 package com.github.fhuss.kafka.streams.cep;
 
+import com.github.fhuss.kafka.streams.cep.core.Sequence;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;

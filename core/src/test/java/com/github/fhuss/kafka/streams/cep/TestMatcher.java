@@ -1,6 +1,6 @@
 package com.github.fhuss.kafka.streams.cep;
 
-import com.github.fhuss.kafka.streams.cep.pattern.SimpleMatcher;
+import com.github.fhuss.kafka.streams.cep.core.pattern.SimpleMatcher;
 
 public class TestMatcher {
 

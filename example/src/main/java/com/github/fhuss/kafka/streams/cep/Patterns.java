@@ -1,8 +1,8 @@
 package com.github.fhuss.kafka.streams.cep;
 
-import com.github.fhuss.kafka.streams.cep.pattern.Pattern;
-import com.github.fhuss.kafka.streams.cep.pattern.QueryBuilder;
-import com.github.fhuss.kafka.streams.cep.pattern.Selected;
+import com.github.fhuss.kafka.streams.cep.core.pattern.Pattern;
+import com.github.fhuss.kafka.streams.cep.core.pattern.QueryBuilder;
+import com.github.fhuss.kafka.streams.cep.core.pattern.Selected;
 
 import java.util.concurrent.TimeUnit;
 
