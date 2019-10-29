@@ -1,5 +1,6 @@
 Complex Event Processing on top of Kafka Streams Processor API !
 =============================================================
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://https://github.com/fhussonnois/kafkastreams-cep/blob/master/LICENCE)
 ![build status](https://travis-ci.org/fhussonnois/kafkastreams-cep.svg?branch=master)
 
 [Apache Kafka](http://kafka.apache.org/) is a high-throughput, distributed, publish-subscribe messaging system.
@@ -403,7 +404,8 @@ key1,{"name":"e8","price":120,"volume":700}
  * Improve test scenarios
 
 ## Contributions
-Any contribution is welcome
+
+Any feedback, bug reports and PRs are greatly appreciated! See our [guideline](./CONTRIBUTING.md)
 
 ## Licence
 Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements. See the NOTICE file distributed with this work for additional information regarding copyright ownership. The ASF licenses this file to you under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
