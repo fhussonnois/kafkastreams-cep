@@ -1,3 +1,19 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.github.fhuss.kafka.streams.cep.core.state.internal;
 
 import com.github.fhuss.kafka.streams.cep.core.Event;
@@ -15,7 +31,9 @@ import java.util.Objects;
  * match event to a {@link MatchedEventStore}.
  *
  * The implementation is based on the paper "Efficient Pattern Matching over Event Streams".
- * @see <a href="https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf">https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf</a>
+ * @see <a href="https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf">
+ *     https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
+ *     </a>
  *
  * @param <K>   the record key type.
  * @param <V>   the record value type.
@@ -88,9 +106,17 @@ public class DelegateSharedVersionedBufferStore<K, V> implements SharedVersioned
     public void put(final Stage<K, V> stage, final Event<K, V> event, final DeweyVersion version) {
         // A MatchedEvent can only by add once to a stack, so there is no need to check for existence.
         MatchedEvent<K, V> value = new MatchedEvent<>(event.key(), event.value(), event.timestamp());
-        value.addPredecessor(version, null); // register an empty predecessor to kept track of the version (akka run).
 
-        final Matched matched = new Matched(stage.getName(), stage.getType(), event.topic(), event.partition(), event.offset());
+        // Register an empty predecessor to kept track of the version (aka run).
+        value.addPredecessor(version, null);
+
+        final Matched matched = new Matched(
+            stage.getName(),
+            stage.getType(),
+            event.topic(),
+            event.partition(),
+            event.offset()
+        );
         LOG.debug("Putting event to store with key={}, value={}", matched, value);
         store.put(matched, value);
     }

@@ -40,6 +40,10 @@
         <url>git@github.com:fhussonnois/kafkastreams-cep.git</url>
     </scm>
 
+    <properties>
+        <checkstyle.config.location>${project.parent.basedir}</checkstyle.config.location>
+    </properties>
+
     <dependencies>
 
         <dependency>

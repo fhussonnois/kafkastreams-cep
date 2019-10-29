@@ -1,10 +1,10 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
+ * contributor license agreements. See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * the License. You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -22,7 +22,9 @@ import java.util.List;
 
 /**
  * The implementation is based on the paper "Efficient Pattern Matching over Event Streams".
- * @see <a href="https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf">https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf</a>
+ * @see <a href="https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf">
+ *      https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
+ *      </a>
  *
  * @param <K> the type of keys
  * @param <V> the type of values
@@ -98,12 +100,12 @@ public class ComputationStage<K, V> {
      */
     public ComputationStage<K, V> setVersion(final DeweyVersion version) {
         return new ComputationStageBuilder<K, V>()
-                .setStage(stage)
-                .setVersion(version)
-                .setEvent(lastEvent)
-                .setTimestamp(timestamp)
-                .setSequence(sequence)
-                .build();
+            .setStage(stage)
+            .setVersion(version)
+            .setEvent(lastEvent)
+            .setTimestamp(timestamp)
+            .setSequence(sequence)
+            .build();
     }
 
     public boolean isIgnored() {
@@ -133,7 +135,7 @@ public class ComputationStage<K, V> {
      */
     boolean isForwarding() {
         List<Stage.Edge<K, V>> edges = stage.getEdges();
-        return ( edges.size() == 1 && edges.get(0).is(EdgeOperation.PROCEED));
+        return edges.size() == 1 && edges.get(0).is(EdgeOperation.PROCEED);
     }
 
     /**
@@ -142,8 +144,7 @@ public class ComputationStage<K, V> {
      */
     boolean isForwardingToFinalState() {
         List<Stage.Edge<K, V>> edges = stage.getEdges();
-        return (isForwarding()
-                && edges.get(0).getTarget().isFinalState());
+        return isForwarding() && edges.get(0).getTarget().isFinalState();
     }
 
     public Stage<K, V> getStage() {

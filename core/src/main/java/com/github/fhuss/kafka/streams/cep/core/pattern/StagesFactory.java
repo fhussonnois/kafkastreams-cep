@@ -1,10 +1,10 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
+ * contributor license agreements. See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * the License. You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -26,7 +26,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.github.fhuss.kafka.streams.cep.core.pattern.Pattern.Cardinality.*;
+import static com.github.fhuss.kafka.streams.cep.core.pattern.Pattern.Cardinality.ONE;
+import static com.github.fhuss.kafka.streams.cep.core.pattern.Pattern.Cardinality.ONE_OR_MORE;
 
 /**
  * Default class to build all states based on a sequence pattern.
@@ -57,7 +58,11 @@ public class StagesFactory<K, V> {
         Pattern<K, V> currentPattern   = pattern;
 
         while( currentPattern.getAncestor() != null) {
-            List<Stage<K, V>> stages = buildStages(Stage.StateType.NORMAL, currentPattern, successorStage, successorPattern);
+            final List<Stage<K, V>> stages = buildStages(
+                Stage.StateType.NORMAL,
+                currentPattern,
+                successorStage,
+                successorPattern);
             sequence.addAll(stages);
             successorStage = stages.get(stages.size() - 1);
             successorPattern = currentPattern;
@@ -122,7 +127,9 @@ public class StagesFactory<K, V> {
 
             Matcher<K, V> successorPredicate = successorPattern.getPredicate();
             if (successorPattern.getSelected().getTopic() != null) {
-                Matcher.TopicPredicate<K,V> left = new Matcher.TopicPredicate<>(successorPattern.getSelected().getTopic());
+                Matcher.TopicPredicate<K,V> left = new Matcher.TopicPredicate<>(
+                    successorPattern.getSelected().getTopic()
+                );
                 successorPredicate = Matcher.and(left, successorPredicate);
             }
 

@@ -1,10 +1,10 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
+ * contributor license agreements. See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * the License. You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -74,7 +74,7 @@ public class MatchedEventSerde<K, V>  implements Serde<MatchedEvent<K, V>>  {
          * @param keys   Serde used for key.
          * @param values Serde used for value.
          */
-        public MatchedEventSerdes(Serde<K> keys, Serde<V> values) {
+        public MatchedEventSerdes(final Serde<K> keys, final Serde<V> values) {
             super(keys, values);
         }
 
@@ -86,11 +86,17 @@ public class MatchedEventSerde<K, V>  implements Serde<MatchedEvent<K, V>>  {
         protected MatchedEvent<K, V> deserialize(final String topic, final Input input) {
             long timestamp = input.readLong();
             long refs = input.readLong();
-            Collection<MatchedEvent.Pointer> processors = (Collection<MatchedEvent.Pointer>)kryo.readClassAndObject(input);
+            final Collection<MatchedEvent.Pointer> processors =
+                    (Collection<MatchedEvent.Pointer>) kryo.readClassAndObject(input);
             int keyBytesSize = input.readInt();
-            K key = (keyBytesSize > 0) ? keys.deserializer().deserialize(topic, input.readBytes(keyBytesSize)) : null;
+
+            final K key = (keyBytesSize > 0) ?
+                keys.deserializer().deserialize(topic, input.readBytes(keyBytesSize)) : null;
             int valueBytesSize = input.readInt();
-            V value = (valueBytesSize > 0) ? values.deserializer().deserialize(topic, input.readBytes(valueBytesSize)) : null;
+
+            final V value = (valueBytesSize > 0) ?
+                values.deserializer().deserialize(topic, input.readBytes(valueBytesSize)) : null;
+
             return new MatchedEvent<>(timestamp, key, value, new AtomicLong(refs), processors);
         }
 
@@ -98,7 +104,7 @@ public class MatchedEventSerde<K, V>  implements Serde<MatchedEvent<K, V>>  {
          * {@inheritDoc}
          */
         @Override
-        protected void serialize(String topic, MatchedEvent<K, V> data, Output output) {
+        protected void serialize(final String topic, final MatchedEvent<K, V> data, final Output output) {
             output.writeLong(data.getTimestamp());
             output.writeLong(data.getRefs().longValue());
             kryo.writeClassAndObject(output, data.getPredecessors());
@@ -106,7 +112,7 @@ public class MatchedEventSerde<K, V>  implements Serde<MatchedEvent<K, V>>  {
             write(topic, values.serializer(), data.getValue(), output);
         }
 
-        private <T> void write(String topic, Serializer<T> ser, T value, Output output) {
+        private <T> void write(final String topic, final Serializer<T> ser, final T value, final Output output) {
             if( value != null) {
                 byte[] valueBytes = ser.serialize(topic, value);
                 output.writeInt(valueBytes.length);

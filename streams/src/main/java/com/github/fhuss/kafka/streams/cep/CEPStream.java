@@ -1,10 +1,10 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
+ * contributor license agreements. See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * the License. You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -32,8 +32,9 @@ public interface CEPStream<K, V> {
     /**
      *
      * @param queryName     the query name.
-     * @param builder       the builder to builder the pattern to query.
-     * @return a {@link KStream} that contains only those records that satisfy the given pattern with unmodified keys and new values.
+     * @param builder       the {@link PatternBuilder} to build the pattern to query.
+     * @return              the {@link KStream} that contains only those records that satisfy
+     *                      the given pattern with unmodified keys and new values.
      */
     default KStream<K, Sequence<K, V>> query(final String queryName, final PatternBuilder<K, V> builder) {
         return query(queryName, builder, null);
@@ -42,9 +43,10 @@ public interface CEPStream<K, V> {
     /**
      *
      * @param queryName     the query name.
-     * @param builder       the builder to builder the pattern to query.
-     * @param queried       the queried object.
-     * @return a {@link KStream} that contains only those records that satisfy the given pattern with unmodified keys and new values.
+     * @param builder       the {@link PatternBuilder} to build the pattern to query.
+     * @param queried       the {@link Queried} instance.
+     * @return              the {@link KStream} that contains only those records that satisfy
+     *                      the given pattern with unmodified keys and new values.
      */
     default KStream<K, Sequence<K, V>> query(final String queryName,
                                              final PatternBuilder<K, V> builder,
@@ -57,7 +59,8 @@ public interface CEPStream<K, V> {
      *
      * @param queryName     the query name.
      * @param pattern       the pattern to query.
-     * @return a {@link KStream} that contains only those records that satisfy the given pattern with unmodified keys and new values.
+     * @return              the {@link KStream} that contains only those records that satisfy
+     *                      the given pattern with unmodified keys and new values.
      */
     default KStream<K, Sequence<K, V>> query(final String queryName, final Pattern<K, V> pattern) {
         return query(queryName, pattern, null);
@@ -68,7 +71,8 @@ public interface CEPStream<K, V> {
      * @param queryName     the query name.
      * @param pattern       the pattern to query.
      * @param queried       the queried object.
-     * @return a {@link KStream} that contains only those records that satisfy the given pattern with unmodified keys and new values.
+     * @return              the {@link KStream} that contains only those records that satisfy
+     *                      the given pattern with unmodified keys and new values.
      */
     KStream<K, Sequence<K, V>> query(final String queryName,
                                      final Pattern<K, V> pattern,

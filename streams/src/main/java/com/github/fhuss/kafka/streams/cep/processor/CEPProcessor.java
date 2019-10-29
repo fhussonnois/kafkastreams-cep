@@ -1,10 +1,10 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
+ * contributor license agreements. See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * the License. You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -18,14 +18,11 @@ package com.github.fhuss.kafka.streams.cep.processor;
 
 import com.github.fhuss.kafka.streams.cep.core.Event;
 import com.github.fhuss.kafka.streams.cep.core.Sequence;
-import com.github.fhuss.kafka.streams.cep.core.nfa.Stages;
-import com.github.fhuss.kafka.streams.cep.core.state.AggregatesStore;
 import com.github.fhuss.kafka.streams.cep.core.nfa.NFA;
-import com.github.fhuss.kafka.streams.cep.core.state.NFAStore;
-import com.github.fhuss.kafka.streams.cep.core.state.SharedVersionedBufferStore;
+import com.github.fhuss.kafka.streams.cep.core.nfa.Stages;
 import com.github.fhuss.kafka.streams.cep.core.pattern.Pattern;
-import com.github.fhuss.kafka.streams.cep.core.state.internal.NFAStates;
 import com.github.fhuss.kafka.streams.cep.core.pattern.StagesFactory;
+import com.github.fhuss.kafka.streams.cep.core.state.internal.NFAStates;
 import com.github.fhuss.kafka.streams.cep.core.state.internal.Runned;
 import com.github.fhuss.kafka.streams.cep.state.AggregatesStateStore;
 import com.github.fhuss.kafka.streams.cep.state.NFAStateStore;
@@ -37,7 +34,6 @@ import org.apache.kafka.streams.processor.StateStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.swing.plaf.nimbus.State;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -121,7 +117,9 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
         currentNFAState = nfaStore.find(runned);
         NFA<K, V> nfa;
         if (currentNFAState != null) {
-            LOG.debug("Recovering existing nfa states for {}, latest offset {}", runned, currentNFAState.getLatestOffsets());
+            LOG.debug("Recovering existing nfa states for {}, latest offset {}",
+                runned,
+                currentNFAState.getLatestOffsets());
             nfa = new NFA<>(
                 aggregatesStore,
                 bufferStore,

@@ -1,10 +1,10 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
+ * contributor license agreements. See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * the License. You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -62,8 +62,7 @@ public class ComputationStageSerde<K, V> extends AbstractKryoSerde<Queue<Computa
      * {@inheritDoc}
      */
     @Override
-    @SuppressWarnings("unchecked")
-    protected Queue<ComputationStage<K, V>> deserialize(String topic, Input input) {
+    protected Queue<ComputationStage<K, V>> deserialize(final String topic, final Input input) {
         int size = input.readInt();
         Queue<ComputationStage<K, V>> ol = new LinkedBlockingQueue<>();
 
@@ -93,7 +92,7 @@ public class ComputationStageSerde<K, V> extends AbstractKryoSerde<Queue<Computa
         return ol;
     }
 
-    private Event<K, V> deserializeEvent(String topic, Input input) {
+    private Event<K, V> deserializeEvent(final String topic, final Input input) {
         boolean hasEvent = input.readBoolean();
         if( hasEvent ) {
             long eventOffset = input.readLong();
@@ -102,9 +101,11 @@ public class ComputationStageSerde<K, V> extends AbstractKryoSerde<Queue<Computa
             long eventTimestamp = input.readLong();
 
             int keyBytesSize = input.readInt();
-            K key = (keyBytesSize > 0) ? keys.deserializer().deserialize(topic, input.readBytes(keyBytesSize)) : null;
+            K key = (keyBytesSize > 0) ?
+                keys.deserializer().deserialize(topic, input.readBytes(keyBytesSize)) : null;
             int valueBytesSize = input.readInt();
-            V value = (valueBytesSize > 0) ? values.deserializer().deserialize(topic, input.readBytes(valueBytesSize)) : null;
+            V value = (valueBytesSize > 0) ?
+                values.deserializer().deserialize(topic, input.readBytes(valueBytesSize)) : null;
 
             return new Event<>(key, value, eventTimestamp, eventTopic, eventPartition, eventOffset);
         }
@@ -115,7 +116,7 @@ public class ComputationStageSerde<K, V> extends AbstractKryoSerde<Queue<Computa
      * {@inheritDoc}
      */
     @Override
-    protected void serialize(String topic, Queue<ComputationStage<K, V>> ol, Output output) {
+    protected void serialize(final String topic, final Queue<ComputationStage<K, V>> ol, final Output output) {
         output.writeInt(ol.size());
         for(ComputationStage<K, V> data : ol) {
 
@@ -135,7 +136,7 @@ public class ComputationStageSerde<K, V> extends AbstractKryoSerde<Queue<Computa
         }
     }
 
-    private void serializeEvent(String topic, ComputationStage<K, V> data, Output output) {
+    private void serializeEvent(final String topic, final ComputationStage<K, V> data, final Output output) {
         Event<K, V> event = data.getLastEvent();
         boolean hasEvent = event != null;
         output.writeBoolean(hasEvent);

@@ -1,10 +1,10 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
+ * contributor license agreements. See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * the License. You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -26,7 +26,9 @@ import com.github.fhuss.kafka.streams.cep.core.state.internal.Matched;
  * A buffer with a compact structure to store partial and complete matches for all runs.
  *
  * The implementation is based on the paper "Efficient Pattern Matching over Event Streams".
- * @see <a href="https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf">https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf</a>
+ * @see <a href="https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf">
+ *     https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
+ *     </a>
  */
 public interface SharedVersionedBufferStore<K , V> {
 
@@ -68,7 +70,8 @@ public interface SharedVersionedBufferStore<K , V> {
      *
      * @param matched the sequence of matching events.
      * @param version the final dewey version of the sequence.
-     * @return the previous sequence associated with state, event and version, or null if there was no sequence for that.
+     * @return the previous sequence associated with state, event and version,
+     *         or {code null} if there was no sequence for that.
      */
     Sequence<K, V> remove(final Matched matched, final DeweyVersion version);
 

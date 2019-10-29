@@ -1,10 +1,10 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
+ * contributor license agreements. See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * the License. You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -49,7 +49,9 @@ import static com.github.fhuss.kafka.streams.cep.core.nfa.EdgeOperation.SKIP_PRO
  * Non-determinism Finite Automaton.
  *
  * The implementation is based on the paper "Efficient Pattern Matching over Event Streams".
- * @see <a href="https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf">https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf</a>
+ * @see <a href="https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf">
+ *     https://people.cs.umass.edu/~yanlei/publications/sase-sigmod08.pdf
+ *     </a>
  *
  * @param <K>   the record key type.
  * @param <V>   the record value type.
@@ -180,7 +182,8 @@ public class NFA<K, V> implements Serializable {
         Collection<ComputationStage<K, V>> nextComputationStages = new ArrayList<>();
 
         // Checks the time window of the current state.
-        if( !ctx.getComputationStage().isBeginState() && ctx.getComputationStage().isOutOfWindow(ctx.getEvent().timestamp()) )
+        if ( !ctx.getComputationStage().isBeginState() &&
+            ctx.getComputationStage().isOutOfWindow(ctx.getEvent().timestamp()) )
             return nextComputationStages;
 
         return evaluate(ctx, ctx.getComputationStage().getStage(), null);
@@ -195,9 +198,15 @@ public class NFA<K, V> implements Serializable {
         final Event<K, V> previousEvent = computationStage.getLastEvent();
         final DeweyVersion version      = computationStage.getVersion();
 
-        List<Stage.Edge<K, V>> matchedEdges = matchEdgesAndGet(previousEvent, ctx.event, version, sequenceId, previousStage, currentStage);
+        final List<Stage.Edge<K, V>> matchedEdges = matchEdgesAndGet(
+            previousEvent,
+            ctx.event,
+            version,
+            sequenceId,
+            previousStage,
+            currentStage);
 
-        Collection<ComputationStage<K, V>> nextComputationStages = new ArrayList<>();
+        final Collection<ComputationStage<K, V>> nextComputationStages = new ArrayList<>();
 
         List<EdgeOperation> operations = matchedEdges
                 .stream()
@@ -376,24 +385,39 @@ public class NFA<K, V> implements Serializable {
                                                     final Stage<K, V> currentStage) {
 
         States<K> states = new States<>(aggregatesStore, currentEvent.key(), sequence);
-        ReadOnlySharedVersionBuffer<K, V> readOnlySharedVersionBuffer = new ReadOnlySharedVersionBuffer<>(sharedVersionedBuffer);
+        final ReadOnlySharedVersionBuffer<K, V> readOnlySharedVersionBuffer =
+            new ReadOnlySharedVersionBuffer<>(sharedVersionedBuffer);
         return currentStage.getEdges()
                 .stream()
-                .filter(e -> e.accept(new MatcherContext<>(readOnlySharedVersionBuffer, version, previousStage, currentStage, previousEvent, currentEvent, states)))
+                .filter(e -> e.accept(new MatcherContext<>(
+                    readOnlySharedVersionBuffer,
+                    version,
+                    previousStage,
+                    currentStage,
+                    previousEvent,
+                    currentEvent,
+                    states))
+                )
                 .collect(Collectors.toList());
     }
 
     /**
-     * A run can be split when the current event actually matches two edges. A split may occur even with strict or non strict contiguity.
-     * @param operations list of edge operations that are matched the current event.
+     * A run can be split when the current event actually matches two edges.
+     * A split may occur even with strict or non strict contiguity.
      *
-     * @return <code>true</code>
+     * @param operations list of edge operations that have matched the current event.
+     *
+     * @return {@code true} if the list of {@link EdgeOperation} is branching, {@code false} otherwise.
      */
     private boolean isBranching(final Collection<EdgeOperation> operations) {
-        return operations.containsAll(Arrays.asList(EdgeOperation.PROCEED, EdgeOperation.TAKE) )  // allowed with multiple match
-                || operations.containsAll(Arrays.asList(EdgeOperation.IGNORE, EdgeOperation.TAKE) ) // allowed by skip-till-any-match
-                || operations.containsAll(Arrays.asList(EdgeOperation.IGNORE, EdgeOperation.BEGIN) ) // allowed by skip-till-any-match
-                || operations.containsAll(Arrays.asList(EdgeOperation.IGNORE, EdgeOperation.PROCEED) ); //allowed by skip-till-next-match or skip-till-any-match
+        // allowed with multiple match
+        return operations.containsAll(Arrays.asList(EdgeOperation.PROCEED, EdgeOperation.TAKE) )
+                // allowed by skip-till-any-match
+                || operations.containsAll(Arrays.asList(EdgeOperation.IGNORE, EdgeOperation.TAKE) )
+                // allowed by skip-till-any-match
+                || operations.containsAll(Arrays.asList(EdgeOperation.IGNORE, EdgeOperation.BEGIN) )
+                //allowed by skip-till-next-match or skip-till-any-match
+                || operations.containsAll(Arrays.asList(EdgeOperation.IGNORE, EdgeOperation.PROCEED) );
     }
 
 

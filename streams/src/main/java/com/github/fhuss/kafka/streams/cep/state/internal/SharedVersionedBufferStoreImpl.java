@@ -1,10 +1,10 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
+ * contributor license agreements. See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * the License. You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -42,7 +42,9 @@ import org.apache.kafka.streams.state.internals.WrappedStateStore;
  * @param <K>   the record key type.
  * @param <V>   the record value type.
  */
-public class SharedVersionedBufferStoreImpl<K , V> extends WrappedStateStore<KeyValueStore<Bytes, byte[]>, K, V> implements SharedVersionedBufferStateStore<K, V> {
+public class SharedVersionedBufferStoreImpl<K , V>
+    extends WrappedStateStore<KeyValueStore<Bytes, byte[]>, K, V>
+    implements SharedVersionedBufferStateStore<K, V> {
 
     private KeyValueStore<Bytes, byte[]> bytesStore;
 
@@ -84,7 +86,11 @@ public class SharedVersionedBufferStoreImpl<K , V> extends WrappedStateStore<Key
                 keySerde == null ?  (Serde<K>) context.keySerde() : keySerde,
                 valueSerde == null ? (Serde<V>) context.valueSerde() : valueSerde);
 
-        final StateSerdes<Matched, MatchedEvent<K, V>> serdes = new StateSerdes<>(topic, new KryoSerDe<>(), valueSerDes);
+        final StateSerdes<Matched, MatchedEvent<K, V>> serdes = new StateSerdes<>(
+            topic,
+            new KryoSerDe<>(),
+            valueSerDes
+        );
         final MatchedEventKeyValueStore<K, V> eventStore = new MatchedEventKeyValueStore<>(bytesStore, serdes);
         delegate = new DelegateSharedVersionedBufferStore<>(eventStore);
     }
