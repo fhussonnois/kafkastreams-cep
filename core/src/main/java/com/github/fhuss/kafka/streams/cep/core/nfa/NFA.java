@@ -411,7 +411,7 @@ public class NFA<K, V> implements Serializable {
         /**
          * Creates a new {@link ComputationContext} instance.
          */
-        private ComputationContext(Event<K, V> event, ComputationStage<K, V> computationStage) {
+        private ComputationContext(final Event<K, V> event, final ComputationStage<K, V> computationStage) {
             this.event = event;
             this.computationStage = computationStage;
         }

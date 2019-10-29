@@ -73,7 +73,7 @@ public class SharedVersionedBufferStoreImplTest {
 
     @SuppressWarnings("unchecked")
     private <K, V> SharedVersionedBufferStore<K, V> getInMemorySharedBuffer(Serde<K> keySerDe, Serde<V> valueSerDe) {
-        InMemoryKeyValueStore test = new InMemoryKeyValueStore("test", Serdes.Bytes(), Serdes.ByteArray());
+        InMemoryKeyValueStore test = new InMemoryKeyValueStore("test");
         SharedVersionedBufferStateStore<K, V> store =  new SharedVersionedBufferStoreImpl<>(test, keySerDe, valueSerDe);
         store.init(new NoOpProcessorContext(), null);
         return store;

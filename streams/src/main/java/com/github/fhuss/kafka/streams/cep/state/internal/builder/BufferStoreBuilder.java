@@ -22,7 +22,6 @@ import com.github.fhuss.kafka.streams.cep.state.internal.SharedVersionedBufferSt
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
-import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.streams.state.KeyValueBytesStoreSupplier;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
@@ -40,9 +39,8 @@ public class BufferStoreBuilder<K, V> extends AbstractStoreBuilder<K, V, SharedV
 
     public BufferStoreBuilder(final KeyValueBytesStoreSupplier storeSupplier,
                               final Serde<K> keySerde,
-                              final Serde<V> valueSerde,
-                              final Time time) {
-        super(storeSupplier.name(), keySerde, valueSerde, time);
+                              final Serde<V> valueSerde) {
+        super(storeSupplier.name(), keySerde, valueSerde);
         this.storeSupplier = storeSupplier;
     }
 
@@ -51,7 +49,21 @@ public class BufferStoreBuilder<K, V> extends AbstractStoreBuilder<K, V, SharedV
      */
     @Override
     public SharedVersionedBufferStateStore<K, V> build() {
-        StoreBuilder<KeyValueStore<Bytes, byte[]>> builder = Stores.keyValueStoreBuilder(storeSupplier, Serdes.Bytes(), Serdes.ByteArray());
+
+        final StoreBuilder<KeyValueStore<Bytes, byte[]>> builder = Stores.keyValueStoreBuilder(
+                storeSupplier,
+                Serdes.Bytes(),
+                Serdes.ByteArray());
+
+        if (enableLogging) {
+            builder.withLoggingEnabled(logConfig());
+        } else {
+            builder.withLoggingDisabled();
+        }
+
+        if (enableCaching) {
+            builder.withCachingEnabled();
+        }
         return new SharedVersionedBufferStoreImpl<>(builder.build(), keySerde, valueSerde);
     }
 }

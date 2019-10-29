@@ -47,8 +47,8 @@ public interface CEPStream<K, V> {
      * @return a {@link KStream} that contains only those records that satisfy the given pattern with unmodified keys and new values.
      */
     default KStream<K, Sequence<K, V>> query(final String queryName,
-                                     final PatternBuilder<K, V> builder,
-                                     final Queried<K, V> queried) {
+                                             final PatternBuilder<K, V> builder,
+                                             final Queried<K, V> queried) {
         return query(queryName, builder.build(), queried);
     }
 

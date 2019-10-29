@@ -17,7 +17,6 @@
 package com.github.fhuss.kafka.streams.cep.state.internal.builder;
 
 import org.apache.kafka.common.serialization.Serde;
-import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.state.StoreBuilder;
 
@@ -31,28 +30,30 @@ public abstract class AbstractStoreBuilder<K, V, T extends StateStore> implement
     private Map<String, String> logConfig = new HashMap<>();
     final Serde<K> keySerde;
     final Serde<V> valueSerde;
-    final Time time;
     boolean enableCaching;
     boolean enableLogging = true;
 
     AbstractStoreBuilder(final String name,
                          final Serde<K> keySerde,
-                         final Serde<V> valueSerde,
-                         final Time time) {
+                         final Serde<V> valueSerde) {
         Objects.requireNonNull(name, "name can't be null");
-        Objects.requireNonNull(time, "time can't be null");
         this.name = name;
         this.keySerde = keySerde;
         this.valueSerde = valueSerde;
-        this.time = time;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public StoreBuilder<T> withCachingEnabled() {
         enableCaching = true;
         return this;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public StoreBuilder<T> withLoggingEnabled(final Map<String, String> config) {
         Objects.requireNonNull(config, "config can't be null");
@@ -61,6 +62,9 @@ public abstract class AbstractStoreBuilder<K, V, T extends StateStore> implement
         return this;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public StoreBuilder<T> withLoggingDisabled() {
         enableLogging = false;
@@ -68,16 +72,34 @@ public abstract class AbstractStoreBuilder<K, V, T extends StateStore> implement
         return this;
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public StoreBuilder<T> withCachingDisabled() {
+        enableCaching = false;
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Map<String, String> logConfig() {
         return logConfig;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean loggingEnabled() {
         return enableLogging;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String name() {
         return name;

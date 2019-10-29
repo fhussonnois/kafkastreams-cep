@@ -23,7 +23,6 @@ import com.github.fhuss.kafka.streams.cep.state.internal.NFAStoreImpl;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
-import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.streams.state.KeyValueBytesStoreSupplier;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
@@ -46,9 +45,8 @@ public class NFAStoreBuilder<K, V> extends AbstractStoreBuilder<K, V, NFAStateSt
     public NFAStoreBuilder(final KeyValueBytesStoreSupplier storeSupplier,
                            final List<Stage<K, V>> stages,
                            final Serde<K> keySerde,
-                           final Serde<V> valueSerde,
-                           final Time time) {
-        super(storeSupplier.name(), keySerde, valueSerde, time);
+                           final Serde<V> valueSerde) {
+        super(storeSupplier.name(), keySerde, valueSerde);
         this.storeSupplier = storeSupplier;
         this.stages = stages;
     }
@@ -58,7 +56,21 @@ public class NFAStoreBuilder<K, V> extends AbstractStoreBuilder<K, V, NFAStateSt
      */
     @Override
     public NFAStateStore<K, V> build() {
-        StoreBuilder<KeyValueStore<Bytes, byte[]>> builder = Stores.keyValueStoreBuilder(storeSupplier, Serdes.Bytes(), Serdes.ByteArray());
+
+        final StoreBuilder<KeyValueStore<Bytes, byte[]>> builder = Stores.keyValueStoreBuilder(
+                storeSupplier,
+                Serdes.Bytes(),
+                Serdes.ByteArray());
+
+        if (enableLogging) {
+            builder.withLoggingEnabled(logConfig());
+        } else {
+            builder.withLoggingDisabled();
+        }
+
+        if (enableCaching) {
+            builder.withCachingEnabled();
+        }
         return new NFAStoreImpl<>(builder.build(), stages, keySerde, valueSerde);
     }
 }

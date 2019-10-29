@@ -18,12 +18,12 @@ package com.github.fhuss.kafka.streams.cep;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
+import org.apache.kafka.streams.TopologyTestDriver;
 import org.apache.kafka.streams.integration.utils.IntegrationTestUtils;
-import org.apache.kafka.test.ProcessorTopologyTestDriver;
+import org.apache.kafka.streams.test.ConsumerRecordFactory;
 import org.apache.kafka.test.TestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -54,8 +54,7 @@ public class CEPStockDemoTest {
 
     private Properties streamsConfiguration = new Properties();
 
-    private ProcessorTopologyTestDriver driver;
-    private static final Serde<String> STRING_SERDE = Serdes.String();
+    private TopologyTestDriver driver;
 
     @Before
     public void before() {
@@ -72,8 +71,7 @@ public class CEPStockDemoTest {
         // Create the topology to start testing
         Topology topology = CEPStockDemo.topology("Stocks", INPUT_STREAM, OUTPUT_STREAM);
 
-        StreamsConfig config = new StreamsConfig(streamsConfiguration);
-        driver = new ProcessorTopologyTestDriver(config, topology);
+        driver = new TopologyTestDriver(topology, streamsConfiguration);
     }
 
     @After
@@ -85,14 +83,18 @@ public class CEPStockDemoTest {
     @Test
     public void test( ) {
 
-        driver.process(INPUT_STREAM, K1, E1, STRING_SERDE.serializer(), STRING_SERDE.serializer());
-        driver.process(INPUT_STREAM, K1, E2, STRING_SERDE.serializer(), STRING_SERDE.serializer());
-        driver.process(INPUT_STREAM, K1, E3, STRING_SERDE.serializer(), STRING_SERDE.serializer());
-        driver.process(INPUT_STREAM, K1, E4, STRING_SERDE.serializer(), STRING_SERDE.serializer());
-        driver.process(INPUT_STREAM, K1, E5, STRING_SERDE.serializer(), STRING_SERDE.serializer());
-        driver.process(INPUT_STREAM, K1, E6, STRING_SERDE.serializer(), STRING_SERDE.serializer());
-        driver.process(INPUT_STREAM, K1, E7, STRING_SERDE.serializer(), STRING_SERDE.serializer());
-        driver.process(INPUT_STREAM, K1, E8, STRING_SERDE.serializer(), STRING_SERDE.serializer());
+        ConsumerRecordFactory<String, String> factory = new ConsumerRecordFactory<>(
+            Serdes.String().serializer(),
+            Serdes.String().serializer());
+
+        driver.pipeInput(factory.create(INPUT_STREAM, K1, E1));
+        driver.pipeInput(factory.create(INPUT_STREAM, K1, E2));
+        driver.pipeInput(factory.create(INPUT_STREAM, K1, E3));
+        driver.pipeInput(factory.create(INPUT_STREAM, K1, E4));
+        driver.pipeInput(factory.create(INPUT_STREAM, K1, E5));
+        driver.pipeInput(factory.create(INPUT_STREAM, K1, E6));
+        driver.pipeInput(factory.create(INPUT_STREAM, K1, E7));
+        driver.pipeInput(factory.create(INPUT_STREAM, K1, E8));
 
         final List<ProducerRecord> expected = new ArrayList<>();
         expected.add(new ProducerRecord<>(OUTPUT_STREAM, K1,
@@ -105,7 +107,10 @@ public class CEPStockDemoTest {
                 "{\"events\":[{\"name\":\"stage-1\",\"events\":[\"e3\"]},{\"name\":\"stage-2\",\"events\":[\"e4\",\"e6\"]},{\"name\":\"stage-3\",\"events\":[\"e8\"]}]}"));
 
         for (int i = 0; i < 4; i ++) {
-            ProducerRecord<String, String> record = driver.readOutput(OUTPUT_STREAM, STRING_SERDE.deserializer(), STRING_SERDE.deserializer());
+            ProducerRecord<String, String> record = driver.readOutput(
+                OUTPUT_STREAM,
+                Serdes.String().deserializer(),
+                Serdes.String().deserializer());
             Assert.assertEquals(expected.get(i).key(), record.key());
             Assert.assertEquals(expected.get(i).value(), record.value());
 

@@ -14,7 +14,7 @@ import com.github.fhuss.kafka.streams.cep.state.internal.NFAStoreImpl;
 import com.github.fhuss.kafka.streams.cep.state.internal.SharedVersionedBufferStoreImpl;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.processor.StateStore;
-import org.apache.kafka.streams.processor.internals.RecordContextStub;
+import org.apache.kafka.streams.processor.internals.ProcessorRecordContext;
 import org.apache.kafka.streams.state.internals.InMemoryKeyValueStore;
 import org.apache.kafka.test.NoOpProcessorContext;
 import org.junit.Assert;
@@ -47,46 +47,34 @@ public class CEPProcessorTest {
 
     @Before
     public void before() {
-        this.context = new MockProcessorContext();
-        this.pattern = PATTERN.build();
+        context = new MockProcessorContext();
+        pattern = PATTERN.build();
 
         StagesFactory<String, String> factory = new StagesFactory<>();
         Stages<String, String> stages = factory.make(pattern);
 
-        this.processor = new CEPProcessor<>(TEST_QUERY, stages);
+        processor = new CEPProcessor<>(TEST_QUERY, stages);
 
         SharedVersionedBufferStateStore<String, String> bufferStore =  new SharedVersionedBufferStoreImpl<>(
-            new InMemoryKeyValueStore<>(
-                QueryStores.getQueryEventBufferStoreName(TEST_QUERY),
-                Serdes.Bytes(),
-                Serdes.ByteArray()
-            ),
+            new InMemoryKeyValueStore(QueryStores.getQueryEventBufferStoreName(TEST_QUERY)),
             Serdes.String(),
             Serdes.String()
         );
 
         AggregatesStateStore<String> aggStore = new AggregatesStoreImpl<>(
-            new InMemoryKeyValueStore<>(
-                QueryStores.getQueryAggregateStatesStoreName(TEST_QUERY),
-                Serdes.Bytes(),
-                Serdes.ByteArray()
-            )
+            new InMemoryKeyValueStore(QueryStores.getQueryAggregateStatesStoreName(TEST_QUERY))
         );
 
         NFAStateStore<String, String> nfaStore = new NFAStoreImpl<>(
-            new InMemoryKeyValueStore<>(
-                QueryStores.getQueryNFAStoreName(TEST_QUERY),
-                Serdes.Bytes(),
-                Serdes.ByteArray()
-            ),
+            new InMemoryKeyValueStore(QueryStores.getQueryNFAStoreName(TEST_QUERY)),
             stages.getAllStages(),
             Serdes.String(),
             Serdes.String()
         );
 
-        this.context.register(bufferStore);
-        this.context.register(aggStore);
-        this.context.register(nfaStore);
+        context.register(bufferStore);
+        context.register(aggStore);
+        context.register(nfaStore);
 
         bufferStore.init(this.context, null);
         aggStore.init(this.context, null);
@@ -115,17 +103,21 @@ public class CEPProcessorTest {
 
     @Test
     public void shouldNotProcessEarliestRecordByTopic() {
-        this.context.setRecordContext(new RecordContextStub(0, System.currentTimeMillis(), 0, TOPIC_TEST_1));
+        this.context.setRecordContext(
+            new ProcessorRecordContext(System.currentTimeMillis(), 0L, 0, TOPIC_TEST_1, null));
         this.processor.init(this.context);
         this.processor.process(KEY_1, DEFAULT_STRING_VALUE);
 
-        this.context.setRecordContext(new RecordContextStub(0, System.currentTimeMillis(), 0, TOPIC_TEST_2));
+        this.context.setRecordContext(
+            new ProcessorRecordContext(System.currentTimeMillis(), 0L, 0, TOPIC_TEST_2, null));
         this.processor.process(KEY_2, DEFAULT_STRING_VALUE);
 
-        this.context.setRecordContext(new RecordContextStub(0, System.currentTimeMillis(), 0, TOPIC_TEST_1));
+        this.context.setRecordContext(
+            new ProcessorRecordContext(System.currentTimeMillis(), 0L, 0, TOPIC_TEST_1, null));
         this.processor.process(KEY_1, DEFAULT_STRING_VALUE);
 
-        this.context.setRecordContext(new RecordContextStub(0, System.currentTimeMillis(), 0, TOPIC_TEST_2));
+        this.context.setRecordContext(
+            new ProcessorRecordContext(System.currentTimeMillis(), 0L, 0, TOPIC_TEST_2, null));
         this.processor.process(KEY_2, DEFAULT_STRING_VALUE);
 
         Assert.assertEquals(2, this.context.forwardedValues.size());

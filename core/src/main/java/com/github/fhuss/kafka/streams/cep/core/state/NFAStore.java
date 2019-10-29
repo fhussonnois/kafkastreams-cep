@@ -26,7 +26,7 @@ import com.github.fhuss.kafka.streams.cep.core.state.internal.Runned;
  */
 public interface NFAStore<K, V> {
 
-    void put(final Runned key, final NFAStates<K, V> state);
+    void put(final Runned<K> key, final NFAStates<K, V> state);
 
-    NFAStates<K, V> find(final Runned key);
+    NFAStates<K, V> find(final Runned<K> key);
 }

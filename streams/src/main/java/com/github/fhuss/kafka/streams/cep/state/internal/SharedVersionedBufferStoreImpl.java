@@ -34,6 +34,7 @@ import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.processor.internals.ProcessorStateManager;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StateSerdes;
+import org.apache.kafka.streams.state.internals.WrappedStateStore;
 
 /**
  * A shared version buffer implementation based on Kafka Streams {@link KeyValueStore}.
@@ -41,7 +42,7 @@ import org.apache.kafka.streams.state.StateSerdes;
  * @param <K>   the record key type.
  * @param <V>   the record value type.
  */
-public class SharedVersionedBufferStoreImpl<K , V> extends WrappedStateStore.AbstractStateStore implements SharedVersionedBufferStateStore<K, V> {
+public class SharedVersionedBufferStoreImpl<K , V> extends WrappedStateStore<KeyValueStore<Bytes, byte[]>, K, V> implements SharedVersionedBufferStateStore<K, V> {
 
     private KeyValueStore<Bytes, byte[]> bytesStore;
 
@@ -74,14 +75,14 @@ public class SharedVersionedBufferStoreImpl<K , V> extends WrappedStateStore.Abs
     @Override
     @SuppressWarnings("unchecked")
     public void init(final ProcessorContext context, final StateStore root) {
+        super.init(context, root);
+
         final String storeName = bytesStore.name();
         String topic = ProcessorStateManager.storeChangelogTopic(context.applicationId(), storeName);
 
         final Serde<MatchedEvent<K, V>> valueSerDes = new MatchedEventSerde<>(
                 keySerde == null ?  (Serde<K>) context.keySerde() : keySerde,
                 valueSerde == null ? (Serde<V>) context.valueSerde() : valueSerde);
-
-        bytesStore.init(context, root);
 
         final StateSerdes<Matched, MatchedEvent<K, V>> serdes = new StateSerdes<>(topic, new KryoSerDe<>(), valueSerDes);
         final MatchedEventKeyValueStore<K, V> eventStore = new MatchedEventKeyValueStore<>(bytesStore, serdes);

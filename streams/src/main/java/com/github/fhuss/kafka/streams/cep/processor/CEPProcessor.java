@@ -27,12 +27,18 @@ import com.github.fhuss.kafka.streams.cep.core.pattern.Pattern;
 import com.github.fhuss.kafka.streams.cep.core.state.internal.NFAStates;
 import com.github.fhuss.kafka.streams.cep.core.pattern.StagesFactory;
 import com.github.fhuss.kafka.streams.cep.core.state.internal.Runned;
+import com.github.fhuss.kafka.streams.cep.state.AggregatesStateStore;
+import com.github.fhuss.kafka.streams.cep.state.NFAStateStore;
 import com.github.fhuss.kafka.streams.cep.state.QueryStores;
+import com.github.fhuss.kafka.streams.cep.state.SharedVersionedBufferStateStore;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.ProcessorContext;
+import org.apache.kafka.streams.processor.StateStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.swing.plaf.nimbus.State;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -52,11 +58,11 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
 
     private String queryName;
 
-    private SharedVersionedBufferStore<K, V> bufferStore;
+    private SharedVersionedBufferStateStore<K, V> bufferStore;
 
-    private AggregatesStore<K> aggregatesStore;
+    private AggregatesStateStore<K> aggregatesStore;
 
-    private NFAStore<K, V> nfaStore;
+    private NFAStateStore<K, V> nfaStore;
 
     private NFAStates<K, V> currentNFAState;
 
@@ -83,87 +89,109 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
         this.queryName = queryName.toLowerCase().replace("\\s+", "");
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     @SuppressWarnings("unchecked")
     public void init(final ProcessorContext context) {
         this.context = context;
 
-        this.nfaStore = (NFAStore<K, V>)
-                context.getStateStore(QueryStores.getQueryNFAStoreName(queryName));
-        if (this.nfaStore == null) {
-            throw new IllegalStateException("Cannot find store with name " + QueryStores.getQueryNFAStoreName(queryName));
-        }
+        final String nfaStateStoreName = QueryStores.getQueryNFAStoreName(queryName);
+        nfaStore = (NFAStateStore<K, V>) context.getStateStore(nfaStateStoreName);
+        validateStateStore(nfaStore, nfaStateStoreName);
 
-        this.bufferStore = (SharedVersionedBufferStore<K, V> )
-                context.getStateStore(QueryStores.getQueryEventBufferStoreName(queryName));
-        if (this.bufferStore == null) {
-            throw new IllegalStateException("Cannot find store with name " + QueryStores.getQueryEventBufferStoreName(queryName));
-        }
+        final String eventBufferStoreName = QueryStores.getQueryEventBufferStoreName(queryName);
+        bufferStore = (SharedVersionedBufferStateStore<K, V>) context.getStateStore(eventBufferStoreName);
+        validateStateStore(bufferStore, eventBufferStoreName);
 
-        this.aggregatesStore = (AggregatesStore<K>)
-                context.getStateStore(QueryStores.getQueryAggregateStatesStoreName(queryName));
-        if (this.aggregatesStore == null) {
-            throw new IllegalStateException("Cannot find store with name " + QueryStores.getQueryAggregateStatesStoreName(queryName));
+        final String aggregateStatesStoreName = QueryStores.getQueryAggregateStatesStoreName(queryName);
+        aggregatesStore = (AggregatesStateStore<K>) context.getStateStore(aggregateStatesStoreName);
+        validateStateStore(aggregatesStore, aggregateStatesStoreName);
+    }
+
+    private static void validateStateStore(final StateStore stateStore, final String storeName) {
+        if (stateStore == null) {
+            throw new IllegalStateException("Cannot find store with name " + storeName);
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private NFA<K, V> loadNFA(Stages<K, V> stages, K key) {
-        final Runned<K> runned = getRunned(key);
-        this.currentNFAState = nfaStore.find(runned);
+    private NFA<K, V> loadNFA(final Stages<K, V> stages, final K key) {
+        final Runned<K> runned = new Runned<>(key);
+        currentNFAState = nfaStore.find(runned);
         NFA<K, V> nfa;
-        if (this.currentNFAState != null) {
-            LOG.debug("Recovering existing nfa states for {}, latest offset {}", runned, this.currentNFAState.getLatestOffsets());
-
-            nfa = new NFA<>(aggregatesStore, bufferStore, stages.getDefinedStates(), this.currentNFAState.getComputationStages(), this.currentNFAState.getRuns());
+        if (currentNFAState != null) {
+            LOG.debug("Recovering existing nfa states for {}, latest offset {}", runned, currentNFAState.getLatestOffsets());
+            nfa = new NFA<>(
+                aggregatesStore,
+                bufferStore,
+                stages.getDefinedStates(),
+                currentNFAState.getComputationStages(),
+                currentNFAState.getRuns());
         } else {
             nfa = NFA.build(stages, aggregatesStore, bufferStore);
-            this.currentNFAState = new NFAStates<>(nfa.getComputationStages(), nfa.getRuns());
+            currentNFAState = new NFAStates<>(nfa.getComputationStages(), nfa.getRuns());
         }
         return nfa;
-    }
-
-    private Runned<K> getRunned(final K key) {
-        return new Runned<>(key);
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public void process(K key, V value) {
+    public void process(final K key, final V value) {
         // If the key or value is null we don't need to proceed
         if (key == null || value == null) {
             return;
         }
-        final NFA<K, V> nfa = loadNFA(this.stages, key);
-        if (checkHighWaterMark()) {
-            Event<K, V> event = new Event<>(key, value, context.timestamp(), context.topic(), context.partition(), context.offset());
-            List<Sequence<K, V>> sequences = nfa.matchPattern(event);
+        List<Sequence<K, V>> sequences = match(key, value);
+        sequences.forEach(seq -> this.context.forward(key, seq));
+    }
 
-            Map<String, Long> latestOffsets = this.currentNFAState.getLatestOffsets();
-            latestOffsets.put(this.context.topic(), this.context.offset() + 1);
-            this.currentNFAState = new NFAStates<>(nfa.getComputationStages(), nfa.getRuns(), latestOffsets);
-            this.nfaStore.put(getRunned(key), this.currentNFAState);
-            sequences.forEach(seq -> this.context.forward(key, seq));
+    public List<Sequence<K, V>> match(final K key, final V value) {
+        final NFA<K, V> nfa = loadNFA(this.stages, key);
+
+        if (!checkHighWaterMark()) {
+            return Collections.emptyList();
         }
+
+        Event<K, V> event = buildEventFor(key, value);
+        List<Sequence<K, V>> sequences = nfa.matchPattern(event);
+
+        Map<String, Long> latestOffsets = currentNFAState.getLatestOffsets();
+        latestOffsets.put(context.topic(), context.offset() + 1);
+        currentNFAState = new NFAStates<>(nfa.getComputationStages(), nfa.getRuns(), latestOffsets);
+        nfaStore.put(new Runned<>(key), currentNFAState);
+
+        return sequences;
+    }
+
+    private Event<K, V> buildEventFor(final K key, final V value) {
+        return new Event<>(
+            key,
+            value,
+            context.timestamp(),
+            context.topic(),
+            context.partition(),
+            context.offset());
     }
 
     private boolean checkHighWaterMark() {
-        Long latestOffset = this.currentNFAState.getLatestOffsetForTopic(this.context.topic());
+        Long latestOffset = currentNFAState.getLatestOffsetForTopic(context.topic());
         if (latestOffset == null) latestOffset = -1L;
-        if (this.context.offset() < latestOffset) {
-            LOG.warn("Offset({}) is prior to the current high-water mark({}) for topic={}", this.context.offset(), latestOffset, this.context.topic());
+        if (context.offset() < latestOffset) {
+            LOG.warn("Offset({}) is prior to the current high-water mark({}) for topic={}",
+                context.offset(),
+                latestOffset,
+                context.topic());
             return false;
         }
         return true;
     }
 
-    @Override
-    public void punctuate(long timestamp) {
-
-    }
-
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void close() {
 

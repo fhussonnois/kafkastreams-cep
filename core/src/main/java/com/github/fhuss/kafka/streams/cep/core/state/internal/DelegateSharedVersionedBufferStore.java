@@ -139,11 +139,11 @@ public class DelegateSharedVersionedBufferStore<K, V> implements SharedVersioned
 
     private Event<K, V> newEvent(final Matched stateKey, final MatchedEvent<K, V> stateValue) {
         return new Event<>(
-                stateValue.getKey(),
-                stateValue.getValue(),
-                stateValue.getTimestamp(),
-                stateKey.getTopic(),
-                stateKey.getPartition(),
-                stateKey.getOffset());
+            stateValue.getKey(),
+            stateValue.getValue(),
+            stateValue.getTimestamp(),
+            stateKey.getTopic(),
+            stateKey.getPartition(),
+            stateKey.getOffset());
     }
 }

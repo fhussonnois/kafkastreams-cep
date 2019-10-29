@@ -16,10 +16,13 @@
  */
 package com.github.fhuss.kafka.streams.cep.state;
 
+import com.github.fhuss.kafka.streams.cep.Queried;
 import com.github.fhuss.kafka.streams.cep.core.nfa.Stages;
 import com.github.fhuss.kafka.streams.cep.core.pattern.Pattern;
 import com.github.fhuss.kafka.streams.cep.core.pattern.StagesFactory;
-import org.apache.kafka.common.serialization.Serde;
+import com.github.fhuss.kafka.streams.cep.state.internal.QueriedInternal;
+import com.github.fhuss.kafka.streams.cep.state.internal.builder.NFAStoreBuilder;
+import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.state.KeyValueBytesStoreSupplier;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
@@ -42,15 +45,15 @@ public class QueryStoreBuilders<K, V> {
 
     /**
      * Creates a new {@link QueryStoreBuilders} instance.
-     * @param queryName the complex query name.
-     * @param pattern   the complex pattern.
+     * @param queryName      the query name.
+     * @param queryPattern   the query {@link Pattern} instance.
      */
-    public QueryStoreBuilders(final String queryName, final Pattern<K, V> pattern) {
+    public QueryStoreBuilders(final String queryName, final Pattern<K, V> queryPattern) {
         Objects.requireNonNull(queryName, "queryName cannot be null");
-        Objects.requireNonNull(pattern, "pattern cannot be null");
+        Objects.requireNonNull(queryPattern, "queryPattern cannot be null");
         this.queryName = queryName;
         this.factory = new StagesFactory<>();
-        this.stages = factory.make(pattern);
+        this.stages = factory.make(queryPattern);
     }
 
 
@@ -59,39 +62,83 @@ public class QueryStoreBuilders<K, V> {
      *
      * @return a new collection of {@link StoreBuilder}.
      */
-    public StoreBuilder<AggregatesStateStore<K>> getAggregateStateStores() {
+    public StoreBuilder<AggregatesStateStore<K>> getAggregateStateStore(final Queried<K, V> queried) {
         final String storeName = QueryStores.getQueryAggregateStatesStoreName(queryName);
-        KeyValueBytesStoreSupplier storeSupplier = Stores.persistentKeyValueStore(storeName);
 
-        return QueryStores.aggregatesStoreBuilder(storeSupplier);
+        final QueriedInternal<K, V> internal = new QueriedInternal<>(queried);
+
+        KeyValueBytesStoreSupplier supplier = (KeyValueBytesStoreSupplier) internal.storeSupplier();
+        if (supplier == null) {
+            supplier = Stores.persistentKeyValueStore(storeName);
+        }
+        final StoreBuilder<AggregatesStateStore<K>> builder = QueryStores.aggregatesStoreBuilder(supplier);
+        return mayEnableCaching(internal, mayEnableLogging(internal, builder));
     }
 
     /**
      * Build a persistent {@link StoreBuilder}.
      *
-     * @param keySerde      the key {@link Serde}.
-     * @param valueSerde    the value {@link Serde}.
+     * @param queried the {@link Queried} instance.
+     *
      * @return a new {@link StoreBuilder} instance.
      */
-    public StoreBuilder<NFAStateStore<K, V>> getNFAStateStoreBuilder(final Serde<K> keySerde,
-                                                                final Serde<V> valueSerde) {
+    public StoreBuilder<NFAStateStore<K, V>> getNFAStateStore(final Queried<K, V> queried) {
         final String storeName = QueryStores.getQueryNFAStoreName(queryName);
-        final KeyValueBytesStoreSupplier storeSupplier = Stores.persistentKeyValueStore(storeName);
 
-        return QueryStores.nfaStoreBuilder(storeSupplier, stages.getAllStages(), keySerde, valueSerde);
+        final QueriedInternal<K, V> internal = new QueriedInternal<>(queried);
+        KeyValueBytesStoreSupplier supplier = (KeyValueBytesStoreSupplier) internal.storeSupplier();
+        if (supplier == null) {
+            supplier = Stores.persistentKeyValueStore(storeName);
+        }
+        final NFAStoreBuilder<K, V> builder = QueryStores.nfaStoreBuilder(
+            supplier,
+            stages.getAllStages(),
+            internal.keySerde(),
+            internal.valueSerde());
+        return mayEnableCaching(internal, mayEnableLogging(internal, builder));
     }
 
     /**
      * Build a new {@link StoreBuilder} used to store match sequences.
      *
-     * @param keySerde      the key {@link Serde}.
-     * @param valueSerde    the value {@link Serde}.
+     * @param queried the {@link Queried} instance.
+     *
      * @return a new {@link StoreBuilder} instance.
      */
-    public StoreBuilder<SharedVersionedBufferStateStore<K, V>> getEventBufferStoreBuilder(final Serde<K> keySerde,
-                                                                                     final Serde<V> valueSerde) {
+    public StoreBuilder<SharedVersionedBufferStateStore<K, V>> getEventBufferStore(final Queried<K, V> queried) {
         final String storeName = QueryStores.getQueryEventBufferStoreName(queryName);
-        KeyValueBytesStoreSupplier storeSupplier = Stores.persistentKeyValueStore(storeName);
-        return QueryStores.bufferStoreBuilder(storeSupplier, keySerde, valueSerde);
+
+        final QueriedInternal<K, V> internal = new QueriedInternal<>(queried);
+        KeyValueBytesStoreSupplier supplier = (KeyValueBytesStoreSupplier) internal.storeSupplier();
+        if (supplier == null) {
+            supplier = Stores.persistentKeyValueStore(storeName);
+        }
+
+        StoreBuilder<SharedVersionedBufferStateStore<K, V>> builder = QueryStores.bufferStoreBuilder(
+            supplier,
+            internal.keySerde(),
+            internal.valueSerde()
+        );
+        return mayEnableCaching(internal, mayEnableLogging(internal, builder));
+    }
+
+    private <T extends StateStore> StoreBuilder<T> mayEnableCaching(final QueriedInternal<K, V> internal,
+                                                                    final StoreBuilder<T> builder) {
+        if (internal.cachingEnabled()) {
+            builder.withCachingEnabled();
+        } else {
+            builder.withCachingDisabled();
+        }
+        return builder;
+    }
+
+    private <T extends StateStore> StoreBuilder<T> mayEnableLogging(final QueriedInternal<K, V> internal,
+                                                                    final StoreBuilder<T> builder) {
+        if (internal.loggingEnabled()) {
+            builder.withLoggingEnabled(internal.logConfig());
+        } else {
+            builder.withLoggingDisabled();
+        }
+        return builder;
     }
 }

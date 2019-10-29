@@ -22,7 +22,6 @@ import com.github.fhuss.kafka.streams.cep.state.internal.builder.AggregatesStore
 import com.github.fhuss.kafka.streams.cep.state.internal.builder.BufferStoreBuilder;
 import com.github.fhuss.kafka.streams.cep.state.internal.builder.NFAStoreBuilder;
 import org.apache.kafka.common.serialization.Serde;
-import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.streams.state.KeyValueBytesStoreSupplier;
 import org.apache.kafka.streams.state.StoreBuilder;
 
@@ -53,22 +52,22 @@ public class QueryStores {
     }
 
     /**
-     * Creates a {@link StoreBuilder} that can be used to build a {@link AggregatesStore}.
+     * Static helper that can be used to create a {@link StoreBuilder} for {@link AggregatesStore}.
      *
      * @param supplier      a {@link KeyValueBytesStoreSupplier}
      * @param <K>           key type
      * @return an instance of {@link StoreBuilder} than can build a {@link AggregatesStore}
      **/
     public static <K> StoreBuilder<AggregatesStateStore<K>> aggregatesStoreBuilder(final KeyValueBytesStoreSupplier supplier) {
-        return new AggregatesStoreBuilder<>(supplier, Time.SYSTEM);
+        return new AggregatesStoreBuilder<>(supplier);
     }
 
     /**
-     * Creates a {@link StoreBuilder} that can be used to build a {@link AggregatesStore}.
+     * Static helper that can be used to create a {@link StoreBuilder} for {@link SharedVersionedBufferStateStore}.
      *
      * @param supplier      the instance of {@link KeyValueBytesStoreSupplier} to use
-     * @param keySerde      the key serde
-     * @param valSerde      the value serde
+     * @param keySerde      the {@link Serde} instance for key.
+     * @param valueSerde      the {@link Serde} instance for value.
      * @param <K>           the type of keys
      * @param <V>           the type of values
      * @return an instance of {@link StoreBuilder} than can build a {@link AggregatesStore}
@@ -76,17 +75,17 @@ public class QueryStores {
     public static <K, V> StoreBuilder<SharedVersionedBufferStateStore<K, V>> bufferStoreBuilder(
             final KeyValueBytesStoreSupplier supplier,
             final Serde<K> keySerde,
-            final Serde<V> valSerde) {
-        return new BufferStoreBuilder<>(supplier, keySerde, valSerde, Time.SYSTEM);
+            final Serde<V> valueSerde) {
+        return new BufferStoreBuilder<>(supplier, keySerde, valueSerde);
     }
 
     /**
-     * Creates a {@link StoreBuilder} that can be used to build a {@link AggregatesStore}.
+     * Static helper that can be used to create a {@link StoreBuilder} for {@link NFAStoreBuilder}.
      *
      * @param supplier      the instance of {@link KeyValueBytesStoreSupplier} to use
      * @param stages        the list of {@link Stage} instance.
-     * @param keySerde      the key serde
-     * @param valSerde      the value serde
+     * @param keySerde      the {@link Serde} instance for key.
+     * @param valueSerde      the {@link Serde} instance for value.
      * @param <K>           the type of keys
      * @param <V>           the type of values
      * @return an instance of {@link StoreBuilder} than can build a {@link AggregatesStore}
@@ -95,7 +94,7 @@ public class QueryStores {
             final KeyValueBytesStoreSupplier supplier,
             final List<Stage<K, V>> stages,
             final Serde<K> keySerde,
-            final Serde<V> valSerde) {
-        return new NFAStoreBuilder<>(supplier, stages, keySerde, valSerde, Time.SYSTEM);
+            final Serde<V> valueSerde) {
+        return new NFAStoreBuilder<>(supplier, stages, keySerde, valueSerde);
     }
 }

@@ -30,10 +30,11 @@ import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.processor.internals.ProcessorStateManager;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StateSerdes;
+import org.apache.kafka.streams.state.internals.WrappedStateStore;
 
 import java.util.List;
 
-public class NFAStoreImpl<K, V> extends WrappedStateStore.AbstractStateStore implements NFAStateStore<K, V> {
+public class NFAStoreImpl<K, V> extends WrappedStateStore<KeyValueStore<Bytes, byte[]>, K, V> implements NFAStateStore<K, V> {
 
     private final KeyValueStore<Bytes, byte[]> bytesStore;
 
@@ -60,15 +61,17 @@ public class NFAStoreImpl<K, V> extends WrappedStateStore.AbstractStateStore imp
      * {@inheritDoc}
      */
     @Override
+    @SuppressWarnings("unchecked")
     public void init(final ProcessorContext context, final StateStore root) {
+        super.init(context, root);
+
         final String storeName = bytesStore.name();
         topic = ProcessorStateManager.storeChangelogTopic(context.applicationId(), storeName);
-        bytesStore.init(context, root);
 
-        Serde<K> kSerde = keySerde == null ? (Serde<K>) context.keySerde() : keySerde;
-        Serde<NFAStates<K, V>> serdes = new NFAStateValueSerde<>(
-                new ComputationStageSerde<>(stages, kSerde, valueSerde == null ? (Serde<V>) context.valueSerde() : valueSerde));
+        final Serde<K> kSerde = keySerde == null ? (Serde<K>) context.keySerde() : keySerde;
+        final Serde<V> vSerde = valueSerde == null ? (Serde<V>) context.valueSerde() : valueSerde;
 
+        Serde<NFAStates<K, V>> serdes = new NFAStateValueSerde<>(new ComputationStageSerde<>(stages, kSerde, vSerde));
         this.serdes = new StateSerdes<>(topic, new RunnedKeySerde<>(kSerde), serdes);
     }
 
@@ -76,7 +79,7 @@ public class NFAStoreImpl<K, V> extends WrappedStateStore.AbstractStateStore imp
      * {@inheritDoc}
      */
     @Override
-    public void put(final Runned key, final NFAStates state) {
+    public void put(final Runned<K> key, final NFAStates<K, V> state) {
         bytesStore.put(Bytes.wrap(serdes.rawKey(key)), serdes.rawValue(state));
     }
 
@@ -84,7 +87,7 @@ public class NFAStoreImpl<K, V> extends WrappedStateStore.AbstractStateStore imp
      * {@inheritDoc}
      */
     @Override
-    public NFAStates<K, V> find(final Runned key) {
+    public NFAStates<K, V> find(final Runned<K> key) {
         byte[] bytes = bytesStore.get(Bytes.wrap(serdes.rawKey(key)));
         return serdes.valueFrom(bytes);
     }

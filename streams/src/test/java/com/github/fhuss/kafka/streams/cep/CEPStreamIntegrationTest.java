@@ -26,13 +26,14 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.streams.Consumed;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
+import org.apache.kafka.streams.TopologyTestDriver;
 import org.apache.kafka.streams.integration.utils.IntegrationTestUtils;
+import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Produced;
-import org.apache.kafka.test.ProcessorTopologyTestDriver;
+import org.apache.kafka.streams.test.ConsumerRecordFactory;
 import org.apache.kafka.test.TestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -98,7 +99,7 @@ public class CEPStreamIntegrationTest {
     private Properties streamsConfiguration = new Properties();
     private static final Serde<String> STRING_SERDE = Serdes.String();
 
-    private ProcessorTopologyTestDriver driver;
+    private TopologyTestDriver driver;
 
     @Before
     public void before() {
@@ -112,7 +113,9 @@ public class CEPStreamIntegrationTest {
 
     @After
     public void after() throws IOException {
-        driver.close();
+        if (driver != null) {
+            driver.close();
+        }
         IntegrationTestUtils.purgeLocalStreamsState(streamsConfiguration);
     }
 
@@ -130,19 +133,21 @@ public class CEPStreamIntegrationTest {
 
         Topology topology = builder.build();
 
-        StreamsConfig config = new StreamsConfig(streamsConfiguration);
-        driver = new ProcessorTopologyTestDriver(config, topology);
+        driver = new TopologyTestDriver(topology, streamsConfiguration);
 
-        driver.process(INPUT_TOPIC_1, K1, 0,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC_1, K2, -10, STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC_1, K2, 0,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC_1, K1, 3,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC_1, K2, 6,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC_1, K1, 1,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC_1, K1, 2,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC_1, K1, 6,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC_1, K2, 4,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC_1, K2, 4,   STRING_SERDE.serializer(), Serdes.Integer().serializer());
+        ConsumerRecordFactory<String, Integer> factory = new ConsumerRecordFactory<>(
+                Serdes.String().serializer(),
+                Serdes.Integer().serializer());
+        driver.pipeInput(factory.create(INPUT_TOPIC_1, K1, 0));
+        driver.pipeInput(factory.create(INPUT_TOPIC_1, K2, -10));
+        driver.pipeInput(factory.create(INPUT_TOPIC_1, K2, 0));
+        driver.pipeInput(factory.create(INPUT_TOPIC_1, K1, 3));
+        driver.pipeInput(factory.create(INPUT_TOPIC_1, K2, 6));
+        driver.pipeInput(factory.create(INPUT_TOPIC_1, K1, 1));
+        driver.pipeInput(factory.create(INPUT_TOPIC_1, K1, 2));
+        driver.pipeInput(factory.create(INPUT_TOPIC_1, K1, 6));
+        driver.pipeInput(factory.create(INPUT_TOPIC_1, K2, 4));
+        driver.pipeInput(factory.create(INPUT_TOPIC_1, K2, 4));
 
         // JSON values are de-serialized as double
         List<ProducerRecord<String, Sequence<String, Double>>> results = new ArrayList<>();
@@ -165,8 +170,6 @@ public class CEPStreamIntegrationTest {
         assertStagesValue(kvTwo.value(), STAGE_1, 0.0);
         assertStagesValue(kvTwo.value(), STAGE_2, 6.0, 4.0);
         assertStagesValue(kvTwo.value(), STAGE_3, 4.0);
-
-        driver.close();
     }
 
     @Test
@@ -184,15 +187,18 @@ public class CEPStreamIntegrationTest {
 
         Topology topology = builder.build();
 
-        StreamsConfig config = new StreamsConfig(streamsConfiguration);
-        driver = new ProcessorTopologyTestDriver(config, topology);
+        driver = new TopologyTestDriver(topology, streamsConfiguration);
 
-        driver.process(INPUT_TOPIC_1, K1, 0, STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC_1, K1, 1, STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC_1, K1, 2, STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC_1, K1, 3, STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC_2, K1, 6, STRING_SERDE.serializer(), Serdes.Integer().serializer());
-        driver.process(INPUT_TOPIC_2, K1, 10, STRING_SERDE.serializer(), Serdes.Integer().serializer());
+        ConsumerRecordFactory<String, Integer> factory = new ConsumerRecordFactory<>(
+            Serdes.String().serializer(),
+            Serdes.Integer().serializer());
+
+        driver.pipeInput(factory.create(INPUT_TOPIC_1, K1, 0));
+        driver.pipeInput(factory.create(INPUT_TOPIC_1, K1, 1));
+        driver.pipeInput(factory.create(INPUT_TOPIC_1, K1, 2));
+        driver.pipeInput(factory.create(INPUT_TOPIC_1, K1, 3));
+        driver.pipeInput(factory.create(INPUT_TOPIC_2, K1, 6));
+        driver.pipeInput(factory.create(INPUT_TOPIC_2, K1, 10));
 
         // JSON values are de-serialized as double
         List<ProducerRecord<String, Sequence<String, Double>>> results = new ArrayList<>();
@@ -227,8 +233,6 @@ public class CEPStreamIntegrationTest {
         assertStagesTopic(second.value(), STAGE_2, INPUT_TOPIC_1, INPUT_TOPIC_1, INPUT_TOPIC_1);
         assertStagesValue(second.value(), STAGE_3, 10.0);
         assertStagesTopic(second.value(), STAGE_3, INPUT_TOPIC_2);
-
-        driver.close();
     }
 
     private <K, V> void assertStagesNames(Sequence<K, V> sequence, String...stages) {

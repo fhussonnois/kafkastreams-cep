@@ -26,13 +26,14 @@ import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.processor.internals.ProcessorStateManager;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StateSerdes;
+import org.apache.kafka.streams.state.internals.WrappedStateStore;
 
 /**
  * Simple {@link AggregatesStateStore} implemented based on a {@link KeyValueStore} instance.
  *
  * @param <K>   the record key type
  */
-public class AggregatesStoreImpl<K> extends WrappedStateStore.AbstractStateStore implements AggregatesStateStore<K> {
+public class AggregatesStoreImpl<K> extends WrappedStateStore<KeyValueStore<Bytes, byte[]>, K, Object> implements AggregatesStateStore<K> {
 
     private StateSerdes<Aggregated<K>, Object> serdes;
 
@@ -53,10 +54,10 @@ public class AggregatesStoreImpl<K> extends WrappedStateStore.AbstractStateStore
      */
     @Override
     public void init(final ProcessorContext context, final StateStore root) {
+        super.init(context, root);
+
         final String storeName = bytesStore.name();
         String topic = ProcessorStateManager.storeChangelogTopic(context.applicationId(), storeName);
-        bytesStore.init(context, root);
-
         serdes = new StateSerdes<>(topic, new AggregateKeySerde<>(), new KryoSerDe<>());
     }
 
@@ -69,7 +70,6 @@ public class AggregatesStoreImpl<K> extends WrappedStateStore.AbstractStateStore
         byte[] bytes = bytesStore.get(Bytes.wrap(serdes.rawKey(aggregated)));
         return (T) serdes.valueFrom(bytes);
     }
-
 
     /**
      * {@inheritDoc}

@@ -16,11 +16,10 @@
  */
 package com.github.fhuss.kafka.streams.cep;
 
-import org.apache.kafka.streams.Consumed;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
+import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.internals.CEPStreamImpl;
 
 import java.util.Collection;
 import java.util.Collections;
