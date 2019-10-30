@@ -16,6 +16,8 @@
  */
 package com.github.fhuss.kafka.streams.cep.processor;
 
+import com.github.fhuss.kafka.streams.cep.CapturedProcessorContext;
+import com.github.fhuss.kafka.streams.cep.Queried;
 import com.github.fhuss.kafka.streams.cep.core.nfa.Stages;
 import com.github.fhuss.kafka.streams.cep.core.pattern.Pattern;
 import com.github.fhuss.kafka.streams.cep.core.pattern.PatternBuilder;
@@ -23,135 +25,144 @@ import com.github.fhuss.kafka.streams.cep.core.pattern.QueryBuilder;
 import com.github.fhuss.kafka.streams.cep.core.pattern.StagesFactory;
 import com.github.fhuss.kafka.streams.cep.state.AggregatesStateStore;
 import com.github.fhuss.kafka.streams.cep.state.NFAStateStore;
-import com.github.fhuss.kafka.streams.cep.state.QueryStores;
+import com.github.fhuss.kafka.streams.cep.state.QueryStoreBuilders;
 import com.github.fhuss.kafka.streams.cep.state.SharedVersionedBufferStateStore;
-import com.github.fhuss.kafka.streams.cep.state.internal.AggregatesStoreImpl;
-import com.github.fhuss.kafka.streams.cep.state.internal.NFAStoreImpl;
-import com.github.fhuss.kafka.streams.cep.state.internal.SharedVersionedBufferStoreImpl;
+import com.github.fhuss.kafka.streams.cep.state.internal.QueriedInternal;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.streams.processor.StateStore;
-import org.apache.kafka.streams.processor.internals.ProcessorRecordContext;
-import org.apache.kafka.streams.state.internals.InMemoryKeyValueStore;
-import org.apache.kafka.test.NoOpProcessorContext;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.kafka.streams.StreamsBuilder;
+import org.apache.kafka.streams.TopologyTestDriver;
+import org.apache.kafka.streams.kstream.KStream;
+import org.apache.kafka.streams.processor.ProcessorContext;
+import org.apache.kafka.streams.state.StoreBuilder;
+import org.apache.kafka.streams.test.ConsumerRecordFactory;
+import org.apache.kafka.test.StreamsTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.junit.Assert.fail;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties;
 
 public class CEPProcessorTest {
 
     private static final String TOPIC_TEST_1         = "topic-test-1";
     private static final String TOPIC_TEST_2         = "topic-test-2";
-    private static final String DEFAULT_STRING_VALUE = "value";
+    private static final String TEST_RECORD_KEY      = "test-key";
+    private static final String TEST_RECORD_VALUE    = "test-value";
     private static final String TEST_QUERY           = "test-query";
 
     private static final PatternBuilder<String, String> PATTERN =  new QueryBuilder<String, String>()
             .select()
             .where((event) -> true);
 
-    private static final String KEY_1 = "key-1";
-    private static final String KEY_2 = "key-2";
-
     private Pattern<String, String> pattern;
-    private CEPProcessor<String, String> processor;
-    private MockProcessorContext context;
 
+    private StoreBuilder<NFAStateStore<String, String>> nfaStateStore ;
+    private StoreBuilder<SharedVersionedBufferStateStore<String, String>> eventBufferStore ;
+    private StoreBuilder<AggregatesStateStore<String>> aggregateStateStores;
+
+    private final Properties props = StreamsTestUtils.getStreamsConfig(Serdes.String(), Serdes.String());
 
     @Before
     public void before() {
-        context = new MockProcessorContext();
         pattern = PATTERN.build();
 
         StagesFactory<String, String> factory = new StagesFactory<>();
         Stages<String, String> stages = factory.make(pattern);
 
-        processor = new CEPProcessor<>(TEST_QUERY, stages);
+        final QueryStoreBuilders<String, String> qsb = new QueryStoreBuilders<>(TEST_QUERY, pattern);
+        final Queried<String, String> queried = new QueriedInternal<>();
+        nfaStateStore = qsb.getNFAStateStore(queried);
+        eventBufferStore = qsb.getEventBufferStore(queried);
+        aggregateStateStores = qsb.getAggregateStateStore(queried);
 
-        SharedVersionedBufferStateStore<String, String> bufferStore =  new SharedVersionedBufferStoreImpl<>(
-            new InMemoryKeyValueStore(QueryStores.getQueryEventBufferStoreName(TEST_QUERY)),
-            Serdes.String(),
-            Serdes.String()
-        );
-
-        AggregatesStateStore<String> aggStore = new AggregatesStoreImpl<>(
-            new InMemoryKeyValueStore(QueryStores.getQueryAggregateStatesStoreName(TEST_QUERY))
-        );
-
-        NFAStateStore<String, String> nfaStore = new NFAStoreImpl<>(
-            new InMemoryKeyValueStore(QueryStores.getQueryNFAStoreName(TEST_QUERY)),
-            stages.getAllStages(),
-            Serdes.String(),
-            Serdes.String()
-        );
-
-        context.register(bufferStore);
-        context.register(aggStore);
-        context.register(nfaStore);
-
-        bufferStore.init(this.context, null);
-        aggStore.init(this.context, null);
-        nfaStore.init(this.context, null);
     }
 
     @Test
-    public void shouldNotProcessWhenKeyIsNull() {
-        try{
-            this.processor.process(null, DEFAULT_STRING_VALUE);
-        }
-        catch(Exception e){
-            fail(e.getMessage());
-        }
-    }
+    public void shouldMeterOnSkippedRecordsWithNullValue() {
 
-    @Test
-    public void shouldNotProcessWhenValueIsNull() {
-        try{
-            this.processor.process(KEY_1, null);
-        }
-        catch(Exception e){
-            fail(e.getMessage());
+        StreamsBuilder builder = new StreamsBuilder();
+        ConsumerRecordFactory<String, String> recordFactory = new ConsumerRecordFactory<>(
+            new StringSerializer(),
+            new StringSerializer()
+        );
+
+        KStream<String, String> stream = builder.stream(TOPIC_TEST_1);
+
+        builder.addStateStore(nfaStateStore);
+        builder.addStateStore(eventBufferStore);
+        builder.addStateStore(aggregateStateStores);
+
+        final String[] stateStoreNames = new String[]{
+            nfaStateStore.name(),
+            eventBufferStore.name(),
+            aggregateStateStores.name()
+        };
+        stream.process(() -> new CEPProcessor<>(TEST_QUERY, pattern), stateStoreNames);
+
+        try (TopologyTestDriver driver = new TopologyTestDriver(builder.build(), this.props)) {
+            driver.pipeInput(recordFactory.create(TOPIC_TEST_1, "A", (String)null));
+            Assert.assertEquals(1.0D,
+            StreamsTestUtils.getMetricByName(
+                driver.metrics(),
+                "skipped-records-total", "stream-metrics")
+            .metricValue());
         }
     }
 
     @Test
-    public void shouldNotProcessEarliestRecordByTopic() {
-        this.context.setRecordContext(
-            new ProcessorRecordContext(System.currentTimeMillis(), 0L, 0, TOPIC_TEST_1, null));
-        this.processor.init(this.context);
-        this.processor.process(KEY_1, DEFAULT_STRING_VALUE);
+    public void shouldForwardMatchingSequencesToDownStreamsProcessors() {
 
-        this.context.setRecordContext(
-            new ProcessorRecordContext(System.currentTimeMillis(), 0L, 0, TOPIC_TEST_2, null));
-        this.processor.process(KEY_2, DEFAULT_STRING_VALUE);
+        StreamsBuilder builder = new StreamsBuilder();
+        KStream<String, String> stream = builder.stream(Arrays.asList(TOPIC_TEST_1, TOPIC_TEST_2));
 
-        this.context.setRecordContext(
-            new ProcessorRecordContext(System.currentTimeMillis(), 0L, 0, TOPIC_TEST_1, null));
-        this.processor.process(KEY_1, DEFAULT_STRING_VALUE);
+        builder.addStateStore(nfaStateStore);
+        builder.addStateStore(eventBufferStore);
+        builder.addStateStore(aggregateStateStores);
 
-        this.context.setRecordContext(
-            new ProcessorRecordContext(System.currentTimeMillis(), 0L, 0, TOPIC_TEST_2, null));
-        this.processor.process(KEY_2, DEFAULT_STRING_VALUE);
+        ConsumerRecordFactory<String, String> recordFactory = new ConsumerRecordFactory<>(
+                new StringSerializer(),
+                new StringSerializer()
+        );
 
-        Assert.assertEquals(2, this.context.forwardedValues.size());
-        Assert.assertNotNull(this.context.forwardedValues.get(KEY_1));
-        Assert.assertNotNull(this.context.forwardedValues.get(KEY_2));
-    }
+        final String[] stateStoreNames = new String[]{
+                nfaStateStore.name(),
+                eventBufferStore.name(),
+                aggregateStateStores.name()
+        };
+        CapturedCEProcessor<String, String> processor = new CapturedCEProcessor<>(TEST_QUERY, pattern);
+        stream.process(() -> processor, stateStoreNames);
 
-    public static class MockProcessorContext extends NoOpProcessorContext {
-
-        private Map<String, StateStore> stores = new HashMap<>();
-
-        void register(StateStore store) {
-            this.stores.put(store.name(), store);
+        try (TopologyTestDriver driver = new TopologyTestDriver(builder.build(), this.props)) {
+            driver.pipeInput(recordFactory.create(TOPIC_TEST_1, TEST_RECORD_KEY, TEST_RECORD_VALUE));
+            driver.pipeInput(recordFactory.create(TOPIC_TEST_2, TEST_RECORD_KEY, TEST_RECORD_VALUE));
         }
 
-        @Override
-        public StateStore getStateStore(String name) {
-            return stores.get(name);
-        }
+        List<CapturedProcessorContext.CapturedForward> capturedForward = processor.context.capturedForward;
+        Assert.assertEquals(2, capturedForward.size());
     }
+
+
+    private static final class CapturedCEProcessor<K, V> extends CEPProcessor<K, V> {
+
+        private CapturedProcessorContext context;
+
+        CapturedCEProcessor(final String queryName, final Pattern<K, V> pattern) {
+            super(queryName, pattern);
+        }
+
+        public void init(final ProcessorContext context) {
+            super.init(context);
+            this.context = new CapturedProcessorContext(context);
+        }
+
+        ProcessorContext context() {
+            return context;
+        }
+
+
+    }
+
 }

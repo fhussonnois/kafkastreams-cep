@@ -141,10 +141,11 @@ public class NFA<K, V> implements Serializable {
         while(numberOfStateToProcess-- > 0) {
             ComputationStage<K, V> computationStage = computationStages.poll();
             Collection<ComputationStage<K, V>> states = matchPattern(new ComputationContext<>(event, computationStage));
-            if (states.isEmpty())
+            if (states.isEmpty()) {
                 removePattern(computationStage);
-            else
+            } else {
                 finalStates.addAll(getAllFinalStates(states));
+            }
             computationStages.addAll(getAllNonFinalStates(states));
         }
         return matchConstruction(finalStates);
@@ -159,7 +160,7 @@ public class NFA<K, V> implements Serializable {
                 .collect(Collectors.toList());
     }
 
-    private void removePattern(ComputationStage<K, V> computationStage) {
+    private void removePattern(final ComputationStage<K, V> computationStage) {
         final Matched matched = Matched.from(computationStage.getStage(), computationStage.getLastEvent());
         sharedVersionedBuffer.remove(matched, computationStage.getVersion());
     }
@@ -171,14 +172,14 @@ public class NFA<K, V> implements Serializable {
                 .collect(Collectors.toList());
     }
 
-    private List<ComputationStage<K, V>> getAllFinalStates(final  Collection<ComputationStage<K, V>> states) {
+    private List<ComputationStage<K, V>> getAllFinalStates(final Collection<ComputationStage<K, V>> states) {
         return states
                 .stream()
                 .filter(ComputationStage::isForwardingToFinalState)
                 .collect(Collectors.toList());
     }
 
-    private Collection<ComputationStage<K, V>> matchPattern(ComputationContext<K, V> ctx) {
+    private Collection<ComputationStage<K, V>> matchPattern(final ComputationContext<K, V> ctx) {
         Collection<ComputationStage<K, V>> nextComputationStages = new ArrayList<>();
 
         // Checks the time window of the current state.

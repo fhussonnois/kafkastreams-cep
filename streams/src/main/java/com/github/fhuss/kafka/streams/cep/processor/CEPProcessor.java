@@ -31,6 +31,7 @@ import com.github.fhuss.kafka.streams.cep.state.SharedVersionedBufferStateStore;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.StateStore;
+import org.apache.kafka.streams.processor.internals.metrics.StreamsMetricsImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,6 +63,8 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
 
     private NFAStates<K, V> currentNFAState;
 
+    private StreamsMetricsImpl metrics;
+
     /**
      * Creates a new {@link CEPProcessor} instance.
      *
@@ -92,6 +95,8 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
     @SuppressWarnings("unchecked")
     public void init(final ProcessorContext context) {
         this.context = context;
+
+        metrics = (StreamsMetricsImpl) context.metrics();
 
         final String nfaStateStoreName = QueryStores.getQueryNFAStoreName(queryName);
         nfaStore = (NFAStateStore<K, V>) context.getStateStore(nfaStateStoreName);
@@ -138,18 +143,24 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
      */
     @Override
     public void process(final K key, final V value) {
-        // If the key or value is null we don't need to proceed
-        if (key == null || value == null) {
-            return;
-        }
         List<Sequence<K, V>> sequences = match(key, value);
-        sequences.forEach(seq -> this.context.forward(key, seq));
+        sequences.forEach(seq -> context().forward(key, seq));
     }
 
     public List<Sequence<K, V>> match(final K key, final V value) {
-        final NFA<K, V> nfa = loadNFA(this.stages, key);
+        // we ignore record if either key or value is null
+        if (key == null || value == null) {
+            LOG.warn(
+                "Skipping record due to null key or value. key=[{}] value=[{}] topic=[{}] partition=[{}] offset=[{}]",
+                key, value, context().topic(), context().partition(), context().offset()
+            );
+            metrics.skippedRecordsSensor().record();
+            return Collections.emptyList();
+        }
 
-        if (!checkHighWaterMark()) {
+        final NFA<K, V> nfa = loadNFA(stages, key);
+
+        if (!checkLastObservedOffset(key, value)) {
             return Collections.emptyList();
         }
 
@@ -157,7 +168,7 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
         List<Sequence<K, V>> sequences = nfa.matchPattern(event);
 
         Map<String, Long> latestOffsets = currentNFAState.getLatestOffsets();
-        latestOffsets.put(context.topic(), context.offset() + 1);
+        latestOffsets.put(context().topic(), context().offset() + 1);
         currentNFAState = new NFAStates<>(nfa.getComputationStages(), nfa.getRuns(), latestOffsets);
         nfaStore.put(new Runned<>(key), currentNFAState);
 
@@ -168,23 +179,33 @@ public class CEPProcessor<K, V> implements Processor<K, V> {
         return new Event<>(
             key,
             value,
-            context.timestamp(),
-            context.topic(),
-            context.partition(),
-            context.offset());
+            context().timestamp(),
+            context().topic(),
+            context().partition(),
+            context().offset());
     }
 
-    private boolean checkHighWaterMark() {
-        Long latestOffset = currentNFAState.getLatestOffsetForTopic(context.topic());
+    private boolean checkLastObservedOffset(final K key, final V value) {
+        Long latestOffset = currentNFAState.getLatestOffsetForTopic(context().topic());
         if (latestOffset == null) latestOffset = -1L;
-        if (context.offset() < latestOffset) {
-            LOG.warn("Offset({}) is prior to the current high-water mark({}) for topic={}",
-                context.offset(),
+        if (context().offset() < latestOffset) {
+            LOG.warn(
+                "Skipping record due to offset prior to the current high-water mark({}). " +
+                "key=[{}] value=[{}] topic=[{}] partition=[{}] offset=[{}]",
                 latestOffset,
-                context.topic());
+                key,
+                value,
+                context().topic(),
+                context().partition(),
+                context().offset()
+            );
             return false;
         }
         return true;
+    }
+
+    ProcessorContext context() {
+        return context;
     }
 
     /**
